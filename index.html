@@ -167,6 +167,13 @@
   .persone .resp { font-weight: 700; color: var(--testo); }
   .persone .assente { color: var(--rosso); text-decoration: line-through; text-decoration-thickness: 1px; }
 
+  /* postazioni di stand, giochi grandi e serate */
+  .postazioni { margin-top: 8px; border-top: 1px dashed var(--linea); padding-top: 6px; }
+  .postazione { display: flex; align-items: baseline; gap: 8px; font-size: .88rem; padding: 3px 0; }
+  .postazione .num { flex: 0 0 22px; font-weight: 700; color: var(--blu-scuro); }
+  .postazione .cosa { flex: 1; min-width: 0; }
+  .postazione .chi { flex: 0 0 auto; color: var(--muto); }
+
   .etichetta {
     display: inline-block; font-size: .72rem; font-weight: 700;
     padding: 2px 9px; border-radius: 999px;
@@ -362,11 +369,15 @@
 /* =====================================================================
    STATO E UTILITÀ
    ===================================================================== */
+// Cambia a ogni modifica dell'interfaccia: compare in fondo alla scheda "Io",
+// così si capisce subito se il telefono sta eseguendo la versione aggiornata.
+const VERSIONE_APP = '2026.09.17';
+
 /* =====================================================================
    CONFIGURAZIONE — l'unica riga da modificare
    ===================================================================== */
 // Incolla qui l'URL della distribuzione Apps Script: finisce in /exec
-const URL_APP = 'https://script.google.com/macros/s/AKfycbzb0yb6M0udSqqkArNuD6xrGYQv5Dr-uShOR7cyF-VbYE9MVmeGdwFqO7WZVDcrQp-PNA/exec';
+const URL_APP = 'INCOLLA_QUI_URL_EXEC';
 
 const S = {
   codice: localStorage.getItem('oratorio_codice') || '',
@@ -381,6 +392,19 @@ const S = {
 };
 
 const MESI = ['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre'];
+
+/*
+ * I metodi nativi replaceChildren e append convertono null e undefined in un
+ * nodo di testo "null": è da lì che arrivavano i "nullnull" sparsi nelle
+ * schede, perché le espressioni condizionali che non producono nulla venivano
+ * stampate. Qui li si fa ignorare, come fa già h().
+ */
+['replaceChildren', 'append'].forEach(metodo => {
+  const nativo = Element.prototype[metodo];
+  Element.prototype[metodo] = function (...figli) {
+    return nativo.apply(this, figli.filter(f => f !== null && f !== undefined && f !== false));
+  };
+});
 
 /** Crea un elemento: h('div', {class:'x', onclick:fn}, [figli...]) */
 function h(tag, attrs, figli) {
@@ -695,20 +719,35 @@ function vistaSabato(d) {
     // presenza (solo per date non passate)
     if (cal.idData >= oggiId()) box.appendChild(blocchettoPresenza(cal.idData, d.presenzaMia));
 
+    // le attività dell'ora prima della Messa stanno insieme al gioco libero,
+    // in una tendina: sono sei ogni sabato e affogherebbero il resto
+    const attivita = d.voci.filter(v => v.categoria === 'Attività');
+    const principali = d.voci.filter(v => v.categoria !== 'Attività');
+
     box.appendChild(h('h2', {}, 'Programma'));
-    if (!d.voci.length) box.appendChild(vuoto('Programma non ancora definito.'));
+    if (!principali.length) box.appendChild(vuoto('Programma non ancora definito.'));
     const lista = h('div', { class: 'lista' });
-    d.voci.forEach(v => lista.appendChild(rigaVoce(v, cal.idData)));
+    principali.forEach(v => lista.appendChild(rigaVoce(v, cal.idData)));
     box.appendChild(lista);
 
-    if (d.ricorrenti.length) {
-      const l2 = h('div', { class: 'lista', style: 'margin-top:12px' });
-      d.ricorrenti.forEach(r => l2.appendChild(h('div', { class: 'riga' + (r.coinvolto ? ' mia' : '') }, [
-        h('div', { class: 'titolo' }, r.attivita),
-        r.persone.length ? h('div', { class: 'persone' }, testoPersone(r.persone)) : null
-      ])));
+    if (attivita.length || d.ricorrenti.length) {
+      const dentro = h('div', {});
+      if (attivita.length) {
+        const l1 = h('div', { class: 'lista', style: 'margin-top:12px' });
+        attivita.forEach(v => l1.appendChild(rigaVoce(v, cal.idData)));
+        dentro.appendChild(l1);
+      }
+      if (d.ricorrenti.length) {
+        const l2 = h('div', { class: 'lista', style: 'margin-top:12px' });
+        d.ricorrenti.forEach(r => l2.appendChild(h('div', { class: 'riga' + (r.coinvolto ? ' mia' : '') }, [
+          h('div', { class: 'titolo' }, r.attivita),
+          r.persone.length ? h('div', { class: 'persone' }, testoPersone(r.persone)) : null
+        ])));
+        dentro.appendChild(l2);
+      }
+      const mie = attivita.some(v => v.coinvolto) || d.ricorrenti.some(r => r.coinvolto);
       box.appendChild(h('div', { style: 'margin-top:10px' },
-        tendina('Laboratori e gioco libero', d.ricorrenti.length, l2)));
+        tendina('Attività e gioco libero', attivita.length + d.ricorrenti.length, dentro, mie)));
     }
   }
   if (!d.prossimo) box.appendChild(h('div', { class: 'azioni' }, h('button', { class: 'b secondario', onclick: () => schermataSabato() }, 'Vai al prossimo sabato')));
@@ -719,7 +758,7 @@ function testoPersone(persone) {
   const el = h('span');
   persone.forEach((p, i) => {
     if (i) el.appendChild(document.createTextNode(', '));
-    const testo = p.nomeVis + (p.ruolo === 'Aiuto' ? ' (aiuto)' : '');
+    const testo = p.nomeVis + (p.ruolo === 'Aiuto' ? ' (aiuto)' : p.ruolo === 'Recita' ? ' (recita)' : '');
     el.appendChild(h('span', {
       class: (p.ruolo === 'Responsabile' ? 'resp' : '') + (p.presenza === 'assente' ? ' assente' : ''),
       title: p.presenza === 'assente' ? 'Ha detto che non ci sarà' : (p.presenza === 'nessuna' ? 'Non ha ancora risposto' : '')
@@ -757,8 +796,10 @@ function rigaVoce(v, idData) {
         v.fascia && v.fascia !== 'Tutti' ? h('span', { class: 'etichetta' }, v.fascia) : null,
         v.scoperto ? h('span', { class: 'etichetta rossa' }, 'responsabile assente') : null]),
       h('div', {}, v.descrizione || h('span', { class: 'muto' }, 'da definire')),
+      v.tema ? h('div', { class: 'sotto' }, 'Tema del periodo: ' + v.tema) : null,
       v.materiale ? h('div', { class: 'sotto' }, 'Materiale: ' + v.materiale) : null,
       v.link ? h('div', { class: 'sotto' }, h('a', { href: v.link, target: '_blank', rel: 'noopener' }, 'Apri il documento della serata')) : null,
+      v.postazioni && v.postazioni.length ? elencoPostazioni(v.postazioni) : null,
       v.note && !v.link ? h('div', { class: 'sotto' }, v.note) : null,
       v.persone.length ? h('div', { class: 'persone' }, testoPersone(v.persone)) : null,
       v.idGioco ? h('div', { class: 'sotto' }, h('a', { href: '#', onclick: e => { e.preventDefault(); apriGioco(v.idGioco); } }, 'Come si gioca')) : null,
@@ -774,15 +815,78 @@ function rigaVoce(v, idData) {
   return riga;
 }
 
+/** Elenco compatto delle postazioni di una voce (stand, secondo gioco, serata). */
+function elencoPostazioni(post) {
+  return h('div', { class: 'postazioni' }, post.map(p => h('div', { class: 'postazione' }, [
+    h('span', { class: 'num' }, p.n),
+    h('span', { class: 'cosa' }, [
+      p.gioco || p.ruolo || h('span', { class: 'muto' }, 'da definire'),
+      p.gioco && p.ruolo ? h('span', { class: 'muto' }, ' · ' + p.ruolo) : null
+    ]),
+    p.nomeVis ? h('span', { class: 'chi' }, p.nomeVis) : h('span', { class: 'chi muto' }, '—'),
+    p.idGioco ? h('a', { href: '#', class: 'piccolo', onclick: e => { e.preventDefault(); apriGioco(p.idGioco); } }, 'regole') : null
+  ])));
+}
+
+/**
+ * Tendina per scegliere una scheda dal catalogo, con accanto il pulsante che
+ * apre al volo il modulo di creazione: il gioco nuovo viene poi selezionato
+ * da solo, senza uscire da dove si stava lavorando.
+ * `soloAttivita` restringe l'elenco alle schede di tipo Attività.
+ */
+async function campoGioco(valore, soloAttivita) {
+  const filtra = g => soloAttivita ? g.tipo === 'Attività' : g.tipo !== 'Attività';
+  const etichetta = soloAttivita ? '— scegli un\'attività —' : '— scegli un gioco —';
+
+  function opzioni(giochi) {
+    return [{ v: '', t: etichetta }].concat(giochi.filter(filtra)
+      .map(g => ({ v: g.id, t: g.nome + (g.tipo && !soloAttivita ? ' · ' + g.tipo : '') })));
+  }
+  const sel = select(opzioni(await caricaGiochi()), valore || '');
+  const area = h('div');
+
+  const nuovo = h('button', { class: 'b secondario piccolo', type: 'button', onclick: () => {
+    if (area.firstChild) { area.replaceChildren(); nuovo.textContent = testoPulsante; return; }
+    nuovo.textContent = 'Chiudi';
+    moduloGioco(area, null,
+      () => { area.replaceChildren(); nuovo.textContent = testoPulsante; },
+      async r => {
+        const giochi = await caricaGiochi();
+        sel.replaceChildren();
+        opzioni(giochi).forEach(o => {
+          const op = h('option', { value: o.v }, o.t);
+          if (o.v === r.id) op.selected = true;
+          sel.appendChild(op);
+        });
+        area.replaceChildren();
+        nuovo.textContent = testoPulsante;
+        toast('Aggiunto e selezionato');
+      });
+  } }, soloAttivita ? '+ Nuova' : '+ Nuovo');
+  const testoPulsante = nuovo.textContent;
+
+  const contenitore = h('div', {}, [
+    h('div', { style: 'display:flex;gap:8px;align-items:center' }, [h('div', { style: 'flex:1;min-width:0' }, sel), nuovo]),
+    area
+  ]);
+  return { sel, contenitore };
+}
+
 /** Modulo di modifica del dettaglio/note di una voce (usato dal sabato e dalla gestione). */
 async function moduloProgramma(v, dopo, annulla) {
-  const eGioco = ['GioEle', 'GioMed', 'Est'].includes(v.idAtt);
-  let campo;
+  // È il server a dirlo (campo vuoleGioco), con la stessa regola che usa per
+  // validare il salvataggio: così non può capitare che qui compaia un campo
+  // libero e poi il salvataggio venga rifiutato.
+  const eGioco = v.vuoleGioco !== undefined
+    ? v.vuoleGioco
+    : ['Gioco', 'Attività'].includes(v.categoria) || ['GioEle', 'GioMed', 'Est'].includes(v.idAtt);
+  let campo, campoVisibile;
   if (eGioco) {
-    const giochi = await caricaGiochi();
-    campo = select([{ v: '', t: '— nessun gioco —' }].concat(giochi.map(g => ({ v: g.id, t: g.nome + (g.tipo ? ' · ' + g.tipo : '') }))), v.dettaglio);
+    const c = await campoGioco(v.dettaglio, v.soloAttivita || v.categoria === 'Attività');
+    campo = c.sel; campoVisibile = c.contenitore;
   } else {
-    campo = h('input', { type: 'text', value: v.dettaglio || '', placeholder: v.idAtt === 'Pre' ? 'Argomento della preghiera' : v.idAtt === 'Ser' ? 'Nome della serata' : 'Dettaglio' });
+    campo = h('input', { type: 'text', value: v.dettaglio || '', placeholder: v.categoria === 'Preghiera' ? 'Argomento della preghiera' : v.categoria === 'Serata' ? 'Nome della serata' : 'Dettaglio' });
+    campoVisibile = campo;
   }
   const note = h('textarea', { placeholder: v.idAtt === 'Ser' ? 'Link al documento della serata (https://…) o note' : 'Note' }, v.note || '');
   const salva = h('button', { class: 'b', onclick: async () => {
@@ -797,7 +901,7 @@ async function moduloProgramma(v, dopo, annulla) {
   } }, 'Salva');
   return h('div', { class: 'modulo' }, [
     h('div', { class: 'titolo' }, v.attivita),
-    h('label', {}, eGioco ? 'Gioco' : 'Dettaglio'), campo,
+    h('label', {}, eGioco ? (v.soloAttivita || v.categoria === 'Attività' ? 'Attività' : 'Gioco') : 'Dettaglio'), campoVisibile,
     h('label', {}, 'Note'), note,
     h('div', { class: 'azioni' }, [salva, h('button', { class: 'b secondario', onclick: annulla }, 'Annulla')])
   ]);
@@ -847,6 +951,7 @@ async function schermataIo() {
     d.estate.length ? rispostoA + ' di ' + d.estate.length : null, dentro));
 
   box.appendChild(h('div', { class: 'azioni', style: 'margin-top:28px' }, h('button', { class: 'b secondario', onclick: esci }, 'Esci')));
+  box.appendChild(h('p', { class: 'muto piccolo', style: 'text-align:center;margin-top:18px' }, 'Versione ' + VERSIONE_APP));
   mostra(box);
 }
 
@@ -1057,7 +1162,7 @@ async function schermataGiochi() {
  * Modulo del gioco, usato sia per crearne uno nuovo sia per correggerne uno
  * esistente. Se riceve `esistente`, salva in modifica invece che in aggiunta.
  */
-async function moduloGioco(area, esistente, annulla) {
+async function moduloGioco(area, esistente, annulla, dopoSalvato) {
   let liste;
   try { liste = await caricaListe(); } catch (e) { area.replaceChildren(errore(e)); return; }
   const g = esistente || {};
@@ -1089,7 +1194,7 @@ async function moduloGioco(area, esistente, annulla) {
       const r = await api(esistente ? 'modificaGioco' : 'nuovoGioco', dati);
       S.giochi = null;
       toast(esistente ? 'Scheda aggiornata' : 'Gioco aggiunto');
-      apriGioco(r.id);
+      if (dopoSalvato) dopoSalvato(r); else apriGioco(r.id);
     } catch (e) { msg.replaceChildren(errore(e)); salva.disabled = false; }
   } }, esistente ? 'Salva le modifiche' : 'Aggiungi il gioco');
 
@@ -1150,7 +1255,7 @@ async function apriGioco(id) {
 async function schermataGestione(scheda, apri) {
   scheda = scheda || 'programma';
   const tab = h('div', { class: 'schede' }, [
-    ['programma', 'Programma'], ['promemoria', 'Promemoria'], ['eventi', 'Eventi'], ['serate', 'Serate'],
+    ['programma', 'Programma'], ['promemoria', 'Promemoria'], ['eventi', 'Eventi'],
     ['estate', 'Estate'], ['contatti', 'Contatti'], ['cruscotto', 'Cruscotto']
   ].map(t => h('button', { class: t[0] === scheda ? 'on' : '', onclick: () => schermataGestione(t[0]) }, t[1])));
   const contenuto = h('div', {}, h('p', { class: 'muto' }, 'Carico…'));
@@ -1159,7 +1264,6 @@ async function schermataGestione(scheda, apri) {
     if (scheda === 'programma') await gestioneProgramma(contenuto);
     else if (scheda === 'promemoria') await gestionePromemoria(contenuto);
     else if (scheda === 'eventi') await gestioneEventi(contenuto, apri);
-    else if (scheda === 'serate') await gestioneSerate(contenuto);
     else if (scheda === 'estate') await gestioneEstate(contenuto);
     else if (scheda === 'contatti') await gestioneContatti(contenuto);
     else await gestioneCruscotto(contenuto);
@@ -1406,9 +1510,20 @@ function blocchettoGestioneVoce(v, g) {
   const assegn = h('div');
 
   function disegnaTesta() {
+    let tipologia = null;
+    if (v.rotazione && g.rotazione && g.rotazione.length) {
+      tipologia = select(g.rotazione.map(r => ({ v: r.id, t: r.nome })), v.idAtt);
+      tipologia.onchange = async () => {
+        if (!confirm('Cambiare la tipologia di gioco di questo sabato? Gioco scelto, persone e postazioni vengono sostituiti con la squadra della nuova tipologia.')) { tipologia.value = v.idAtt; return; }
+        try { await api('cambiaTipoGioco', { idData: g.sabato.calendario.idData, idAtt: tipologia.value }); toast('Tipologia cambiata'); schermataGestione('programma'); }
+        catch (e) { toast(e, true); tipologia.value = v.idAtt; }
+      };
+    }
     testa.replaceChildren(
       h('div', { class: 'titolo' }, v.attivita),
-      h('div', {}, v.descrizione || h('span', { class: 'muto' }, 'da definire')),
+      tipologia ? h('div', {}, [h('label', {}, 'Tipologia di questo sabato'), tipologia]) : null,
+      h('div', { style: tipologia ? 'margin-top:8px' : '' }, v.descrizione || h('span', { class: 'muto' }, 'da definire')),
+      v.tema ? h('div', { class: 'sotto' }, 'Tema del periodo: ' + v.tema) : null,
       v.note ? h('div', { class: 'sotto' }, v.note) : null,
       h('div', { class: 'azioni' }, h('button', { class: 'b secondario piccolo', onclick: async () => {
         testa.replaceChildren(await moduloProgramma(v, r => { Object.assign(v, r); disegnaTesta(); }, disegnaTesta));
@@ -1456,56 +1571,58 @@ function blocchettoGestioneVoce(v, g) {
   }
   disegnaTesta(); disegnaAssegnazioni();
   box.append(testa, assegn);
+  if (v.conPostazioni) box.appendChild(editorPostazioni(v, g));
   return box;
 }
 
-async function gestioneSerate(cont) {
-  await caricaCalendario(); await caricaAnimatori();
-  const serate = S.calendario.sabati.filter(s => s.serata);
-  if (!serate.length) { cont.replaceChildren(vuoto('Nessuna serata in calendario.')); return; }
-  const oggi = oggiId();
-  const primo = (serate.find(s => s.idData >= oggi) || serate[serate.length - 1]).idData;
-  const area = h('div');
-  const sel = selettoreData(s => s.serata, S.serataData || primo, id => { S.serataData = id; carica(id); });
-  cont.replaceChildren(h('label', {}, 'Serata'), sel, area);
+/** Editor delle postazioni di una voce: stand, secondo gioco, personaggi della serata. */
+function editorPostazioni(v, g) {
+  const cont = h('div', { style: 'margin-top:12px' });
+  const etichetta = v.categoria === 'Serata' ? 'Postazioni e personaggi della serata'
+    : v.idAtt === 'GioSta' ? 'Gli stand' : 'Altri giochi del pomeriggio';
+  const animOpz = [{ v: '', t: '— nessuno —' }].concat(g.animatori.map(a => ({ v: a.id, t: a.nomeVis })));
 
-  async function carica(idData) {
-    area.replaceChildren(h('p', { class: 'muto' }, 'Carico…'));
-    let righe;
-    try { righe = await api('serata', { idData }); } catch (e) { area.replaceChildren(errore(e)); return; }
-    const intro = righe[0] ? h('p', { class: 'muto' }, [righe[0].nomeSerata ? 'Serata: ' + righe[0].nomeSerata : 'Nome serata non ancora impostato (si modifica dalla voce Serata in Programma).',
-      righe[0].link ? h('span', {}, [' · ', h('a', { href: righe[0].link, target: '_blank', rel: 'noopener' }, 'documento')]) : null]) : null;
-    const lista = h('div');
-    righe.forEach(r => lista.appendChild(moduloPostazione(idData, r, () => carica(idData))));
-    const prossimoN = righe.reduce((m, r) => Math.max(m, r.n || 0), 0) + 1;
-    area.replaceChildren(intro, lista, h('div', { class: 'azioni' }, h('button', { class: 'b secondario', onclick: () => {
-      lista.appendChild(moduloPostazione(idData, { n: prossimoN, idAnimatore: '', ruolo: '', materiale: '', note: '' }, () => carica(idData)));
-    } }, 'Aggiungi postazione')));
+  async function modulo(p, dove) {
+    const cg = await campoGioco(p.idGioco, false);
+    const gioco = cg.sel;
+    const anim = select(animOpz, p.idAnimatore || '');
+    const ruolo = h('input', { type: 'text', value: p.ruolo || '', placeholder: v.categoria === 'Serata' ? 'Ruolo o personaggio' : 'Ruolo (facoltativo)' });
+    const mat = h('input', { type: 'text', value: p.materiale || '', placeholder: 'Materiale in più rispetto alla scheda' });
+    const note = h('input', { type: 'text', value: p.note || '', placeholder: 'Note' });
+    const salva = h('button', { class: 'b piccolo', onclick: async () => {
+      try {
+        await api('salvaPostazione', { idProg: v.idProg, nPostazione: p.n, idGioco: gioco.value, idAnimatore: anim.value, ruolo: ruolo.value, materiale: mat.value, note: note.value });
+        toast('Postazione ' + p.n + ' salvata');
+      } catch (e) { toast(e, true); }
+    } }, 'Salva');
+    const elimina = h('button', { class: 'b pericolo piccolo', onclick: async () => {
+      if (!confirm('Eliminare la postazione ' + p.n + '?')) return;
+      try { await api('salvaPostazione', { idProg: v.idProg, nPostazione: p.n, elimina: true }); toast('Eliminata'); schermataGestione('programma'); }
+      catch (e) { toast(e, true); }
+    } }, 'Elimina');
+    dove.replaceChildren(h('div', { class: 'modulo', style: 'margin:8px 0' }, [
+      h('div', { class: 'titolo' }, 'Postazione ' + p.n),
+      h('label', {}, 'Gioco'), cg.contenitore,
+      h('label', {}, 'Animatore'), anim,
+      h('label', {}, 'Ruolo / personaggio'), ruolo,
+      h('label', {}, 'Materiale'), mat,
+      h('label', {}, 'Note'), note,
+      h('div', { class: 'azioni' }, [salva, elimina])
+    ]));
   }
-  carica(sel.value);
-}
 
-function moduloPostazione(idData, r, ricarica) {
-  const anim = select([{ v: '', t: '— nessuno —' }].concat(S.animatori.map(a => ({ v: a.id, t: a.nomeVis }))), r.idAnimatore || '');
-  const ruolo = h('input', { type: 'text', value: r.ruolo || '', placeholder: 'Ruolo o personaggio' });
-  const mat = h('input', { type: 'text', value: r.materiale || '', placeholder: 'Materiale' });
-  const note = h('input', { type: 'text', value: r.note || '', placeholder: 'Note' });
-  const salva = h('button', { class: 'b piccolo', onclick: async () => {
-    try { await api('salvaSerata', { idData, nPostazione: r.n, idAnimatore: anim.value, ruolo: ruolo.value, materiale: mat.value, note: note.value }); toast('Postazione ' + r.n + ' salvata'); }
-    catch (e) { toast(e, true); }
-  } }, 'Salva');
-  const elimina = h('button', { class: 'b pericolo piccolo', onclick: async () => {
-    if (!confirm('Eliminare la postazione ' + r.n + '?')) return;
-    try { await api('salvaSerata', { idData, nPostazione: r.n, elimina: true }); toast('Eliminata'); ricarica(); } catch (e) { toast(e, true); }
-  } }, 'Elimina');
-  return h('div', { class: 'modulo' }, [
-    h('div', { class: 'titolo' }, 'Postazione ' + r.n),
-    h('label', {}, 'Animatore'), anim,
-    h('label', {}, 'Ruolo / personaggio'), ruolo,
-    h('label', {}, 'Materiale'), mat,
-    h('label', {}, 'Note'), note,
-    h('div', { class: 'azioni' }, [salva, elimina])
-  ]);
+  const lista = h('div');
+  (v.postazioni || []).forEach(p => { const d = h('div'); lista.appendChild(d); modulo(p, d); });
+  const prossimoN = (v.postazioni || []).reduce((m, p) => Math.max(m, p.n || 0), 0) + 1;
+  const det = tendina(etichetta, (v.postazioni || []).length || null, h('div', {}, [
+    lista,
+    h('div', { class: 'azioni' }, h('button', { class: 'b secondario piccolo', onclick: () => {
+      const n = lista.children.length + prossimoN - (v.postazioni || []).length;
+      const d = h('div'); lista.appendChild(d); modulo({ n }, d);
+    } }, '+ Aggiungi postazione'))
+  ]), (v.postazioni || []).length > 0 && (v.postazioni || []).some(p => !p.idAnimatore));
+  cont.appendChild(det);
+  return cont;
 }
 
 async function gestioneEstate(cont) {
@@ -1549,12 +1666,12 @@ async function gestioneCruscotto(cont) {
 async function schermataAdmin(scheda) {
   scheda = scheda || 'pin';
   const tab = h('div', { class: 'schede' }, [
-    ['pin', 'PIN'], ['calendar', 'Google Calendar'], ['controlli', 'Controlli'], ['calendario', 'Calendario'], ['anagrafica', 'Anagrafica'], ['squadre', 'Squadre'], ['archivio', 'Fine anno']
+    ['pin', 'PIN'], ['preghiere', 'Preghiere'], ['calendar', 'Google Calendar'], ['controlli', 'Controlli'], ['calendario', 'Calendario'], ['anagrafica', 'Anagrafica'], ['squadre', 'Squadre'], ['archivio', 'Fine anno']
   ].map(t => h('button', { class: t[0] === scheda ? 'on' : '', onclick: () => schermataAdmin(t[0]) }, t[1])));
   const cont = h('div', {}, h('p', { class: 'muto' }, 'Carico…'));
   mostra(h('div', {}, [h('h2', { style: 'margin-top:4px' }, 'Amministrazione'), tab, cont]));
   try {
-    await ({ pin: adminPin, calendar: adminCalendar, controlli: adminControlli, calendario: adminCalendario, anagrafica: adminAnagrafica, squadre: adminSquadre, archivio: adminArchivio })[scheda](cont);
+    await ({ pin: adminPin, preghiere: adminPreghiere, calendar: adminCalendar, controlli: adminControlli, calendario: adminCalendario, anagrafica: adminAnagrafica, squadre: adminSquadre, archivio: adminArchivio })[scheda](cont);
   } catch (e) { cont.replaceChildren(errore(e)); }
 }
 
@@ -1583,6 +1700,27 @@ async function adminPin(cont) {
     gen, esito,
     h('h3', { style: 'margin-top:24px' }, 'Reset di un singolo PIN'),
     h('label', {}, 'Animatore'), sel, h('div', { style: 'margin-top:10px' }, reset), esitoReset
+  );
+}
+
+async function adminPreghiere(cont) {
+  const esito = h('div');
+  const rifai = h('input', { type: 'checkbox', style: 'width:auto;min-height:0;margin-right:8px' });
+  const btn = h('button', { class: 'b', onclick: async () => {
+    if (rifai.checked && !confirm('Rifare TUTTE le estrazioni dei sabati futuri? Chi recita resta.')) return;
+    btn.disabled = true;
+    try {
+      const r = await api('sorteggiaPreghiere', { rifai: rifai.checked });
+      esito.replaceChildren(r.sorteggiate
+        ? h('div', {}, [h('p', {}, r.sorteggiate + ' preghiere sorteggiate.'), h('div', { class: 'pinlista' }, r.righe.join('\n'))])
+        : h('p', { class: 'muto' }, 'Tutti i sabati futuri hanno già chi prepara la preghiera.'));
+    } catch (e) { esito.replaceChildren(errore(e)); }
+    btn.disabled = false;
+  } }, 'Sorteggia le preghiere');
+  cont.replaceChildren(
+    h('p', {}, 'Per ogni sabato futuro senza nessuno assegnato estrae un Animatore che la prepara e un Aiutoanimatore che lo aiuta, bilanciando i carichi ed evitando le coppie già uscite. Chi la recita si sceglie a mano, nel programma, con il ruolo «Recita».'),
+    h('label', {}, [rifai, 'Rifai anche i sabati già assegnati']),
+    h('div', { style: 'margin-top:12px' }, btn), esito
   );
 }
 
