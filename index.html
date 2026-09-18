@@ -12,6 +12,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Oratorio">
+  <script src="config.js"></script>
   <style>
   /* I due loghi dell'oratorio, incorporati come immagini in linea:
      nessun file esterno da caricare, funzionano anche senza rete.
@@ -374,10 +375,11 @@
 const VERSIONE_APP = '2026.09.17';
 
 /* =====================================================================
-   CONFIGURAZIONE — l'unica riga da modificare
+   CONFIGURAZIONE
+   L'indirizzo del server sta in config.js, che si carica una volta sola e
+   non va più toccato: così aggiornare questo file non lo cancella.
    ===================================================================== */
-// Incolla qui l'URL della distribuzione Apps Script: finisce in /exec
-const URL_APP = 'INCOLLA_QUI_URL_EXEC';
+const URL_APP = (typeof window.URL_APP === 'string' ? window.URL_APP : '').trim();
 
 const S = {
   codice: localStorage.getItem('oratorio_codice') || '',
@@ -500,6 +502,9 @@ function attesa(on) {
  * In caso di errore rifiuta con una stringa leggibile, non con un oggetto.
  */
 async function api(azione, dati) {
+  if (!/^https:\/\/script\.google\.com\/macros\/.+\/exec$/.test(URL_APP)) {
+    throw 'Manca l\'indirizzo del server: apri config.js e incolla l\'URL della distribuzione Apps Script (finisce in /exec).';
+  }
   attesa(true);
   let risposta;
   try {

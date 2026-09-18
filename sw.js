@@ -3,8 +3,8 @@
    arrivano sempre dal server, così non si vedono mai informazioni vecchie.
    Cambiando VERSIONE la cache viene rifatta al prossimo avvio. */
 
-const VERSIONE = 'oratorio-v4';
-const GUSCIO = ['./', './index.html', './manifest.json', './icona-192.png', './icona-512.png'];
+const VERSIONE = 'oratorio-v5';
+const GUSCIO = ['./', './index.html', './config.js', './manifest.json', './icona-192.png', './icona-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VERSIONE).then(c => c.addAll(GUSCIO)).then(() => self.skipWaiting()));
