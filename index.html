@@ -13,6 +13,8 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Oratorio">
   <script src="config.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
   <style>
   /* I due loghi dell'oratorio, incorporati come immagini in linea:
      nessun file esterno da caricare, funzionano anche senza rete.
@@ -955,6 +957,11 @@ async function schermataIo() {
   box.appendChild(tendina('Disponibilità estate',
     d.estate.length ? rispostoA + ' di ' + d.estate.length : null, dentro));
 
+  box.appendChild(h('h2', {}, 'Notifiche'));
+  const areaNotifiche = h('div');
+  box.appendChild(areaNotifiche);
+  disegnaNotifiche(areaNotifiche);
+
   box.appendChild(h('div', { class: 'azioni', style: 'margin-top:28px' }, h('button', { class: 'b secondario', onclick: esci }, 'Esci')));
   box.appendChild(h('p', { class: 'muto piccolo', style: 'text-align:center;margin-top:18px' }, 'Versione ' + VERSIONE_APP));
   mostra(box);
@@ -986,6 +993,96 @@ function rigaEstate(idAnimatore, e, risposte) {
 /* =====================================================================
    SCHERMATA 4 — CALENDARIO
    ===================================================================== */
+/* =====================================================================
+   NOTIFICHE PUSH
+   Il permesso lo concede la persona sul proprio telefono; il browser genera
+   una chiave per quel dispositivo, che il server salva e usa per spedire.
+   ===================================================================== */
+
+/** true se questo telefono può ricevere notifiche. */
+function notifichePossibili() {
+  return typeof firebase !== 'undefined' && 'Notification' in window &&
+    'serviceWorker' in navigator && 'PushManager' in window &&
+    typeof window.FIREBASE_CONFIG === 'object' && typeof window.VAPID_KEY === 'string' && window.VAPID_KEY.length > 20;
+}
+
+let _messaging = null;
+function messaging() {
+  if (!_messaging) {
+    if (!firebase.apps.length) firebase.initializeApp(window.FIREBASE_CONFIG);
+    _messaging = firebase.messaging();
+  }
+  return _messaging;
+}
+
+/** Chiede il permesso, ottiene la chiave del dispositivo e la registra. */
+async function attivaNotifiche() {
+  if (!notifichePossibili()) throw 'Questo telefono non può ricevere le notifiche dell\'app.';
+  const permesso = await Notification.requestPermission();
+  if (permesso !== 'granted') {
+    throw permesso === 'denied'
+      ? 'Hai negato il permesso. Per riattivarlo servono le impostazioni del browser per questo sito.'
+      : 'Permesso non concesso.';
+  }
+  const registrazione = await navigator.serviceWorker.ready;
+  const token = await messaging().getToken({ vapidKey: window.VAPID_KEY, serviceWorkerRegistration: registrazione });
+  if (!token) throw 'Il browser non ha rilasciato la chiave per le notifiche.';
+  localStorage.setItem('oratorio_push', token);
+  await api('registraDispositivo', { token, dispositivo: navigator.userAgent.slice(0, 120) });
+  return token;
+}
+
+async function disattivaNotifiche() {
+  const token = localStorage.getItem('oratorio_push');
+  if (token) {
+    try { await messaging().deleteToken(); } catch (e) { /* può fallire, non importa */ }
+    await api('rimuoviDispositivo', { token });
+    localStorage.removeItem('oratorio_push');
+  }
+}
+
+/** Il riquadro nella scheda Io, con il pulsante per attivarle o spegnerle. */
+async function disegnaNotifiche(area) {
+  area.replaceChildren(h('p', { class: 'muto piccolo' }, 'Controllo…'));
+  let stato;
+  try { stato = await api('statoNotifiche', { token: localStorage.getItem('oratorio_push') || '' }); }
+  catch (e) { area.replaceChildren(errore(e)); return; }
+
+  if (!stato.configurate) {
+    area.replaceChildren(h('div', { class: 'modulo' },
+      h('p', { class: 'muto piccolo', style: 'margin:0' }, 'Le notifiche non sono ancora state attivate dall\'oratorio.')));
+    return;
+  }
+  if (!notifichePossibili()) {
+    area.replaceChildren(h('div', { class: 'modulo' }, [
+      h('p', { class: 'muto piccolo', style: 'margin:0' },
+        /iPhone|iPad|iPod/.test(navigator.userAgent)
+          ? 'Su iPhone le notifiche funzionano solo se aggiungi l\'app alla schermata Home da Safari: Condividi → Aggiungi a Home.'
+          : 'Questo browser non supporta le notifiche. Prova ad aprire l\'app da Chrome.')
+    ]));
+    return;
+  }
+
+  const attive = stato.questo && Notification.permission === 'granted';
+  const btn = h('button', { class: attive ? 'b secondario' : 'b', onclick: async () => {
+    btn.disabled = true;
+    try {
+      if (attive) { await disattivaNotifiche(); toast('Notifiche disattivate'); }
+      else { await attivaNotifiche(); toast('Notifiche attive su questo telefono'); }
+      disegnaNotifiche(area);
+    } catch (e) { area.appendChild(errore(e)); btn.disabled = false; }
+  } }, attive ? 'Disattiva su questo telefono' : 'Attiva le notifiche');
+
+  area.replaceChildren(h('div', { class: 'modulo' }, [
+    h('div', { class: 'titolo' }, attive ? 'Attive su questo telefono' : 'Non attive su questo telefono'),
+    h('p', { class: 'muto piccolo' }, attive
+      ? 'Il giovedì sera ricevi il promemoria di quello che ti tocca sabato.'
+      : 'Attivandole ricevi il giovedì sera il promemoria di quello che ti tocca sabato.'),
+    stato.dispositivi > 1 ? h('p', { class: 'muto piccolo' }, 'Le hai attive su ' + stato.dispositivi + ' dispositivi.') : null,
+    h('div', { class: 'azioni' }, btn)
+  ]));
+}
+
 /** Una riga della schermata Anno: un sabato con la sua data a sinistra. */
 function rigaSabato(s, oggi) {
   const d = dataDaId(s.idData);
@@ -1360,15 +1457,62 @@ async function gestionePromemoria(cont) {
       h('div', { class: 'piccolo', style: 'margin-top:6px' }, 'Correggi il contatto in Anagrafica per farli comparire qui.')
     ]) : null;
 
+    // --- invio delle notifiche
+    const areaPush = h('div');
+    const push = h('div', { class: 'modulo' }, [
+      h('div', { class: 'titolo' }, 'Notifiche'),
+      areaPush
+    ]);
+    disegnaInvioPush(areaPush, idData);
+
     area.replaceChildren(
+      push,
+      tendina('Messaggi WhatsApp di riserva', conNumero.length, h('div', {}, [
       gruppo,
       h('h2', {}, 'Uno per uno (' + conNumero.length + ')'),
       h('p', { class: 'piccolo muto', style: 'margin-top:-6px' }, 'Ogni pulsante apre WhatsApp sulla chat della persona con il messaggio già scritto: devi solo premere invio.'),
       senza,
       ...righe
+      ]))
     );
   }
   carica(sel.value);
+}
+
+/** Pulsante di invio immediato e stato della copertura. */
+async function disegnaInvioPush(area, idData) {
+  area.replaceChildren(h('p', { class: 'muto piccolo' }, 'Controllo…'));
+  let c;
+  try { c = await api('coperturaNotifiche'); } catch (e) { area.replaceChildren(errore(e)); return; }
+  if (!c.configurate) {
+    area.replaceChildren(h('p', { class: 'muto piccolo' }, 'Non ancora configurate: servono le credenziali Firebase, dal menu del foglio.'));
+    return;
+  }
+  const esito = h('div');
+  const btn = h('button', { class: 'b', onclick: async () => {
+    if (!confirm('Mandare adesso il promemoria a chi ha un incarico questo sabato?')) return;
+    btn.disabled = true;
+    esito.replaceChildren(h('p', { class: 'muto piccolo' }, 'Invio in corso…'));
+    try {
+      const r = await api('inviaPromemoria', { idData });
+      esito.replaceChildren(h('div', {}, [
+        h('p', {}, r.inviate + ' notifiche inviate' + (r.fallite ? ', ' + r.fallite + ' non riuscite' : '') + '.'),
+        r.senzaNotifiche && r.senzaNotifiche.length
+          ? h('p', { class: 'muto piccolo' }, 'Senza notifiche attive: ' + r.senzaNotifiche.join(', ') + '. Usa i messaggi qui sotto.')
+          : null
+      ]));
+    } catch (e) { esito.replaceChildren(errore(e)); }
+    btn.disabled = false;
+  } }, 'Manda i promemoria ora');
+
+  area.replaceChildren(
+    h('p', { class: 'muto piccolo', style: 'margin-top:0' },
+      'Partono da sole il giovedì alle 18. ' + c.con.length + ' animatori su ' + (c.con.length + c.senza.length) + ' le hanno attive.'),
+    c.senza.length ? tendina('Chi non le ha ancora attivate', c.senza.length,
+      h('p', { class: 'piccolo', style: 'margin:8px 0 0' }, c.senza.join(', '))) : null,
+    h('div', { class: 'azioni' }, btn),
+    esito
+  );
 }
 
 /** Calendario parrocchiale: elenco per mese, con aggiunta, modifica ed eliminazione. */
@@ -1671,12 +1815,12 @@ async function gestioneCruscotto(cont) {
 async function schermataAdmin(scheda) {
   scheda = scheda || 'pin';
   const tab = h('div', { class: 'schede' }, [
-    ['pin', 'PIN'], ['preghiere', 'Preghiere'], ['calendar', 'Google Calendar'], ['controlli', 'Controlli'], ['calendario', 'Calendario'], ['anagrafica', 'Anagrafica'], ['squadre', 'Squadre'], ['archivio', 'Fine anno']
+    ['pin', 'PIN'], ['notifiche', 'Notifiche'], ['preghiere', 'Preghiere'], ['calendar', 'Google Calendar'], ['controlli', 'Controlli'], ['calendario', 'Calendario'], ['anagrafica', 'Anagrafica'], ['squadre', 'Squadre'], ['archivio', 'Fine anno']
   ].map(t => h('button', { class: t[0] === scheda ? 'on' : '', onclick: () => schermataAdmin(t[0]) }, t[1])));
   const cont = h('div', {}, h('p', { class: 'muto' }, 'Carico…'));
   mostra(h('div', {}, [h('h2', { style: 'margin-top:4px' }, 'Amministrazione'), tab, cont]));
   try {
-    await ({ pin: adminPin, preghiere: adminPreghiere, calendar: adminCalendar, controlli: adminControlli, calendario: adminCalendario, anagrafica: adminAnagrafica, squadre: adminSquadre, archivio: adminArchivio })[scheda](cont);
+    await ({ pin: adminPin, notifiche: adminNotifiche, preghiere: adminPreghiere, calendar: adminCalendar, controlli: adminControlli, calendario: adminCalendario, anagrafica: adminAnagrafica, squadre: adminSquadre, archivio: adminArchivio })[scheda](cont);
   } catch (e) { cont.replaceChildren(errore(e)); }
 }
 
@@ -1705,6 +1849,52 @@ async function adminPin(cont) {
     gen, esito,
     h('h3', { style: 'margin-top:24px' }, 'Reset di un singolo PIN'),
     h('label', {}, 'Animatore'), sel, h('div', { style: 'margin-top:10px' }, reset), esitoReset
+  );
+}
+
+async function adminNotifiche(cont) {
+  let st;
+  try { st = await api('statoAttivatore'); } catch (e) { cont.replaceChildren(errore(e)); return; }
+  if (!st.configurate) {
+    cont.replaceChildren(h('div', { class: 'avviso' },
+      'Prima servono le credenziali Firebase: dal foglio, menu Oratorio → Configura le notifiche.'));
+    return;
+  }
+  const esito = h('div');
+  const btn = h('button', { class: st.attivo ? 'b secondario' : 'b', onclick: async () => {
+    btn.disabled = true;
+    try {
+      const r = await api('programmaPromemoria', { attiva: !st.attivo });
+      toast(r.attivo ? 'Invio automatico attivo' : 'Invio automatico spento');
+      schermataAdmin('notifiche');
+    } catch (e) { esito.replaceChildren(errore(e)); btn.disabled = false; }
+  } }, st.attivo ? 'Spegni l\'invio automatico' : 'Attiva l\'invio automatico');
+
+  const titolo = h('input', { type: 'text', placeholder: 'Titolo' });
+  const corpo = h('textarea', { placeholder: 'Testo dell\'avviso' }, '');
+  const esitoAvviso = h('div');
+  const manda = h('button', { class: 'b', onclick: async () => {
+    if (!titolo.value.trim() || !corpo.value.trim()) { esitoAvviso.replaceChildren(errore('Servono titolo e testo.')); return; }
+    if (!confirm('Mandare questo avviso a tutti quelli che hanno le notifiche attive?')) return;
+    manda.disabled = true;
+    try {
+      const r = await api('inviaAvviso', { titolo: titolo.value, corpo: corpo.value });
+      esitoAvviso.replaceChildren(h('p', {}, r.inviate + ' notifiche inviate' + (r.fallite ? ', ' + r.fallite + ' non riuscite' : '') + '.'));
+      titolo.value = ''; corpo.value = '';
+    } catch (e) { esitoAvviso.replaceChildren(errore(e)); }
+    manda.disabled = false;
+  } }, 'Manda l\'avviso');
+
+  cont.replaceChildren(
+    h('p', {}, st.attivo
+      ? 'I promemoria partono ogni giovedì alle 18 per il sabato successivo. Se il prossimo sabato è oltre una settimana, non parte niente.'
+      : 'L\'invio automatico è spento: i promemoria partono solo a mano, da Gestione → Promemoria.'),
+    h('div', { class: 'azioni' }, btn), esito,
+    h('h2', {}, 'Avviso a tutti'),
+    h('p', { class: 'muto piccolo' }, 'Una notifica immediata a chiunque le abbia attive: per un cambio di programma o una comunicazione urgente.'),
+    h('label', {}, 'Titolo'), titolo,
+    h('label', {}, 'Testo'), corpo,
+    h('div', { class: 'azioni' }, manda), esitoAvviso
   );
 }
 
