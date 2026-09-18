@@ -3,7 +3,7 @@
    arrivano sempre dal server, così non si vedono mai informazioni vecchie.
    Cambiando VERSIONE la cache viene rifatta al prossimo avvio. */
 
-const VERSIONE = 'oratorio-v1';
+const VERSIONE = 'oratorio-v4';
 const GUSCIO = ['./', './index.html', './manifest.json', './icona-192.png', './icona-512.png'];
 
 self.addEventListener('install', e => {
