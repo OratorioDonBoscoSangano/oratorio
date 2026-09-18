@@ -3,4 +3,4 @@
    trovi in Distribuisci → Gestisci distribuzioni.
    Questo file NON va risostituito quando aggiorno index.html. */
 
-window.URL_APP = 'INCOLLA_QUI_URL_EXEC';
+window.URL_APP = 'https://script.google.com/macros/s/AKfycbzb0yb6M0udSqqkArNuD6xrGYQv5Dr-uShOR7cyF-VbYE9MVmeGdwFqO7WZVDcrQp-PNA/exec';
