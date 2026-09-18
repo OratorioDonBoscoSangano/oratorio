@@ -1505,9 +1505,17 @@ async function disegnaInvioPush(area, idData) {
     btn.disabled = false;
   } }, 'Manda i promemoria ora');
 
+  let quando = 'Invio automatico spento.';
+  try {
+    const st = await api('statoAttivatore');
+    const accesi = (st.sabato || []).filter(r => r.attivo)
+      .map(r => (st.giorni.find(g => g.id === r.giorno) || {}).nome + ' alle ' + ('0' + r.ora).slice(-2));
+    if (accesi.length) quando = 'Partono da sole ' + accesi.join(' e ') + '.';
+  } catch (e) { /* non è essenziale */ }
+
   area.replaceChildren(
     h('p', { class: 'muto piccolo', style: 'margin-top:0' },
-      'Partono da sole il giovedì alle 18. ' + c.con.length + ' animatori su ' + (c.con.length + c.senza.length) + ' le hanno attive.'),
+      quando + ' ' + c.con.length + ' animatori su ' + (c.con.length + c.senza.length) + ' le hanno attive.'),
     c.senza.length ? tendina('Chi non le ha ancora attivate', c.senza.length,
       h('p', { class: 'piccolo', style: 'margin:8px 0 0' }, c.senza.join(', '))) : null,
     h('div', { class: 'azioni' }, btn),
@@ -1561,6 +1569,8 @@ async function gestioneEventi(cont, apriId) {
     const oraF = h('input', { type: 'time', value: e.oraFine });
     const luogo = h('input', { type: 'text', value: e.luogo, placeholder: 'Dove si svolge' });
     const nota = h('textarea', { placeholder: 'Note' }, e.nota);
+    const avvisa = h('input', { type: 'checkbox', style: 'width:auto;min-height:0;margin-right:8px' });
+    avvisa.checked = !!e.avvisa;
     const msg = h('div');
 
     const salva = h('button', { class: 'b', onclick: async () => {
@@ -1569,7 +1579,8 @@ async function gestioneEventi(cont, apriId) {
         const r = await api('salvaEvento', {
           id: e.id, idData: compatta(inizio.value), idDataFine: compatta(fine.value) || compatta(inizio.value),
           titolo: titolo.value, categoria: categoria.value,
-          oraInizio: oraI.value, oraFine: oraF.value, luogo: luogo.value, nota: nota.value
+          oraInizio: oraI.value, oraFine: oraF.value, luogo: luogo.value, nota: nota.value,
+          avvisa: avvisa.checked
         });
         toast(e.id ? 'Evento aggiornato' : 'Evento aggiunto');
         S.calendario = null;
@@ -1598,6 +1609,7 @@ async function gestioneEventi(cont, apriId) {
       h('p', { class: 'muto piccolo' }, 'Senza orario l\'evento vale per tutta la giornata.'),
       h('label', {}, 'Luogo'), luogo,
       h('label', {}, 'Note'), nota,
+      h('label', {}, [avvisa, 'Avvisa tutti con una notifica']),
       msg,
       h('div', { class: 'azioni' }, [salva, elimina,
         h('button', { class: 'b secondario', onclick: () => area.replaceChildren() }, 'Chiudi')])
@@ -1860,16 +1872,47 @@ async function adminNotifiche(cont) {
       'Prima servono le credenziali Firebase: dal foglio, menu Oratorio → Configura le notifiche.'));
     return;
   }
-  const esito = h('div');
-  const btn = h('button', { class: st.attivo ? 'b secondario' : 'b', onclick: async () => {
-    btn.disabled = true;
-    try {
-      const r = await api('programmaPromemoria', { attiva: !st.attivo });
-      toast(r.attivo ? 'Invio automatico attivo' : 'Invio automatico spento');
-      schermataAdmin('notifiche');
-    } catch (e) { esito.replaceChildren(errore(e)); btn.disabled = false; }
-  } }, st.attivo ? 'Spegni l\'invio automatico' : 'Attiva l\'invio automatico');
 
+  const ore = Array.from({ length: 24 }, (_, i) => ({ v: String(i), t: ('0' + i).slice(-2) + ':00' }));
+  const giorni = st.giorni.map(g => ({ v: g.id, t: g.nome }));
+
+  // due promemoria del sabato
+  const righe = st.sabato.map((r, i) => {
+    const attivo = h('input', { type: 'checkbox', style: 'width:auto;min-height:0;margin-right:8px' });
+    attivo.checked = !!r.attivo;
+    const giorno = select(giorni, r.giorno);
+    const ora = select(ore, String(r.ora));
+    return { attivo, giorno, ora, blocco: h('div', { class: 'modulo' }, [
+      h('div', { class: 'titolo' }, i === 0 ? 'Primo promemoria' : 'Secondo promemoria'),
+      h('label', {}, [attivo, 'Attivo']),
+      h('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:10px' }, [
+        h('div', {}, [h('label', {}, 'Giorno'), giorno]),
+        h('div', {}, [h('label', {}, 'Ora'), ora])
+      ])
+    ]) };
+  });
+
+  // avviso degli eventi della parrocchia
+  const evAttivo = h('input', { type: 'checkbox', style: 'width:auto;min-height:0;margin-right:8px' });
+  evAttivo.checked = !!st.eventi.attivo;
+  const evOra = select(ore, String(st.eventi.ora));
+  const evAnticipo = select([{ v: '0', t: 'lo stesso giorno' }, { v: '1', t: 'il giorno prima' },
+    { v: '2', t: 'due giorni prima' }, { v: '3', t: 'tre giorni prima' }], String(st.eventi.anticipo || 1));
+
+  const esito = h('div');
+  const salva = h('button', { class: 'b', onclick: async () => {
+    salva.disabled = true;
+    try {
+      const r = await api('programmaPromemoria', {
+        sabato: righe.map(x => ({ giorno: x.giorno.value, ora: x.ora.value, attivo: x.attivo.checked })),
+        eventi: { ora: evOra.value, anticipo: evAnticipo.value, attivo: evAttivo.checked }
+      });
+      toast('Orari salvati');
+      schermataAdmin('notifiche');
+    } catch (e) { esito.replaceChildren(errore(e)); salva.disabled = false; }
+  } }, 'Salva gli orari');
+
+  // avviso immediato a tutti
   const titolo = h('input', { type: 'text', placeholder: 'Titolo' });
   const corpo = h('textarea', { placeholder: 'Testo dell\'avviso' }, '');
   const esitoAvviso = h('div');
@@ -1886,10 +1929,24 @@ async function adminNotifiche(cont) {
   } }, 'Manda l\'avviso');
 
   cont.replaceChildren(
-    h('p', {}, st.attivo
-      ? 'I promemoria partono ogni giovedì alle 18 per il sabato successivo. Se il prossimo sabato è oltre una settimana, non parte niente.'
-      : 'L\'invio automatico è spento: i promemoria partono solo a mano, da Gestione → Promemoria.'),
-    h('div', { class: 'azioni' }, btn), esito,
+    h('h2', { style: 'margin-top:0' }, 'Promemoria del sabato'),
+    h('p', { class: 'muto piccolo' }, 'Arrivano solo a chi ha un incarico quel sabato. Il testo si adatta da solo: dice «oggi», «domani» o la data, a seconda di quanto manca.'),
+    ...righe.map(x => x.blocco),
+
+    h('h2', {}, 'Eventi della parrocchia'),
+    h('p', { class: 'muto piccolo' }, 'Arrivano a tutti, ma solo per gli eventi contrassegnati con «Avvisa tutti» in Gestione → Eventi.'),
+    h('div', { class: 'modulo' }, [
+      h('label', {}, [evAttivo, 'Attivo']),
+      h('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:10px' }, [
+        h('div', {}, [h('label', {}, 'Quando'), evAnticipo]),
+        h('div', {}, [h('label', {}, 'Ora'), evOra])
+      ])
+    ]),
+
+    h('div', { class: 'azioni' }, salva), esito,
+    h('p', { class: 'muto piccolo', style: 'margin-top:14px' },
+      'Google fa partire gli invii in una finestra di un\'ora: con le 18 la notifica arriva fra le 18 e le 19.'),
+
     h('h2', {}, 'Avviso a tutti'),
     h('p', { class: 'muto piccolo' }, 'Una notifica immediata a chiunque le abbia attive: per un cambio di programma o una comunicazione urgente.'),
     h('label', {}, 'Titolo'), titolo,
