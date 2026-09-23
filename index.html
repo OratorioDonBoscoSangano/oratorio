@@ -222,6 +222,28 @@
   }
   input.pin { font-size: 1.7rem; font-weight: 700; letter-spacing: .45em; text-align: center; padding-left: .45em; }
 
+  /* Caselle di spunta come interruttori: lo stile dei campi di testo qui sopra
+     (appearance: none) cancellava il segno di spunta e le rendeva illeggibili. */
+  input[type=checkbox] {
+    position: relative; flex: none; cursor: pointer; vertical-align: middle;
+    width: 46px !important; height: 28px; min-height: 0 !important; padding: 0 !important;
+    margin: 0 10px 0 0 !important; border: none; border-radius: 999px;
+    background: #C9CFDB; transition: background .15s;
+  }
+  input[type=checkbox]::after {
+    content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px;
+    border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .15s;
+  }
+  input[type=checkbox]:checked { background: var(--blu); }
+  input[type=checkbox]:checked::after { transform: translateX(18px); }
+  input[type=checkbox]:disabled { opacity: .45; cursor: default; }
+  input[type=checkbox]:focus { border: none; }
+  label:has(> input[type=checkbox]) {
+    display: flex; align-items: center; min-height: var(--tocco); margin: 6px 0;
+    font-size: .95rem; color: var(--testo); cursor: pointer;
+  }
+  @media (prefers-reduced-motion: reduce) { input[type=checkbox], input[type=checkbox]::after { transition: none; } }
+
   .segmento {
     display: flex; gap: 5px; padding: 5px;
     background: var(--blu-tenue); border-radius: 999px; margin: 9px 0 2px;
@@ -374,7 +396,7 @@
    ===================================================================== */
 // Cambia a ogni modifica dell'interfaccia: compare in fondo alla scheda "Io",
 // così si capisce subito se il telefono sta eseguendo la versione aggiornata.
-const VERSIONE_APP = '2026.09.17';
+const VERSIONE_APP = '2026.09.23b';
 
 /* =====================================================================
    CONFIGURAZIONE
@@ -529,6 +551,28 @@ async function api(azione, dati) {
   throw msg;
 }
 
+/**
+ * Più letture in un'unica chiamata al server: ogni viaggio verso Apps Script
+ * costa circa un secondo, qualunque cosa chieda. Restituisce un elenco con,
+ * per ogni richiesta, { ok, dati } oppure { ok:false, errore }.
+ * Esempio: apiInsieme(['io', ['sabato', { idData }]])
+ */
+async function apiInsieme(richieste) {
+  const elenco = richieste.map(r => Array.isArray(r) ? { azione: r[0], dati: r[1] || {} } : { azione: r, dati: {} });
+  try {
+    return await api('insieme', { richieste: elenco });
+  } catch (e) {
+    // server non ancora aggiornato: si ripiega sulle chiamate singole
+    if (!/sconosciuta/.test(e)) throw e;
+    const esiti = [];
+    for (const r of elenco) {
+      try { esiti.push({ ok: true, dati: await api(r.azione, r.dati) }); }
+      catch (err) { esiti.push({ ok: false, errore: err }); }
+    }
+    return esiti;
+  }
+}
+
 function dataDaId(id) { return new Date(+id.slice(0,4), +id.slice(4,6)-1, +id.slice(6,8)); }
 function oggiId() { const d = new Date(); return d.getFullYear() + ('0'+(d.getMonth()+1)).slice(-2) + ('0'+d.getDate()).slice(-2); }
 function mostra(el) { document.getElementById('main').replaceChildren(el); window.scrollTo(0, 0); }
@@ -541,10 +585,12 @@ function errore(msg) { return h('div', { class: 'errore' }, msg); }
 async function avvio() {
   if (!S.token) return schermataAccesso();
   try {
-    const io = await api('io');
-    S.utente = io.utente;
+    // chi sono e il prossimo sabato: un solo viaggio al server
+    const [io, sabato] = await apiInsieme(['io', 'prossimoSabato']);
+    if (!io.ok) throw io.errore;
+    S.utente = io.dati.utente;
     dopoAccesso();
-    schermataSabato();
+    schermataSabato(null, sabato.ok ? sabato.dati : null);
   } catch (e) {
     S.token = null; localStorage.removeItem('oratorio_token');
     schermataAccesso();
@@ -691,12 +737,14 @@ async function caricaCalendario() { if (!S.calendario) S.calendario = await api(
 /* =====================================================================
    SCHERMATA 2 — SABATO
    ===================================================================== */
-async function schermataSabato(idData) {
+async function schermataSabato(idData, giaCaricato) {
   segnaNav('sabato');
-  mostra(h('p', { class: 'muto' }, 'Carico il programma…'));
-  let d;
-  try { d = await (idData ? api('sabato', { idData }) : api('prossimoSabato')); }
-  catch (e) { mostra(errore(e)); return; }
+  let d = giaCaricato;
+  if (!d) {
+    mostra(h('p', { class: 'muto' }, 'Carico il programma…'));
+    try { d = await (idData ? api('sabato', { idData }) : api('prossimoSabato')); }
+    catch (e) { mostra(errore(e)); return; }
+  }
   mostra(vistaSabato(d));
 }
 
@@ -1420,7 +1468,13 @@ async function gestionePromemoria(cont) {
   async function carica(idData) {
     area.replaceChildren(h('p', { class: 'muto' }, 'Preparo i messaggi…'));
     let d;
-    try { d = await api('promemoria', { idData }); } catch (e) { area.replaceChildren(errore(e)); return; }
+    // messaggi, copertura delle notifiche e orari automatici: un solo viaggio
+    let copertura, stato;
+    try {
+      const [p, c, st] = await apiInsieme([['promemoria', { idData }], 'coperturaNotifiche', 'statoAttivatore']);
+      if (!p.ok) throw p.errore;
+      d = p.dati; copertura = c; stato = st;
+    } catch (e) { area.replaceChildren(errore(e)); return; }
     if (d.chiuso) { area.replaceChildren(vuoto('Quel sabato l\'oratorio è chiuso.')); return; }
 
     // --- messaggio per il gruppo
@@ -1463,7 +1517,7 @@ async function gestionePromemoria(cont) {
       h('div', { class: 'titolo' }, 'Notifiche'),
       areaPush
     ]);
-    disegnaInvioPush(areaPush, idData);
+    disegnaInvioPush(areaPush, idData, copertura, stato);
 
     area.replaceChildren(
       push,
@@ -1480,10 +1534,15 @@ async function gestionePromemoria(cont) {
 }
 
 /** Pulsante di invio immediato e stato della copertura. */
-async function disegnaInvioPush(area, idData) {
-  area.replaceChildren(h('p', { class: 'muto piccolo' }, 'Controllo…'));
+async function disegnaInvioPush(area, idData, copertura, stato) {
   let c;
-  try { c = await api('coperturaNotifiche'); } catch (e) { area.replaceChildren(errore(e)); return; }
+  if (copertura) {
+    if (!copertura.ok) { area.replaceChildren(errore(copertura.errore)); return; }
+    c = copertura.dati;
+  } else {
+    area.replaceChildren(h('p', { class: 'muto piccolo' }, 'Controllo…'));
+    try { c = await api('coperturaNotifiche'); } catch (e) { area.replaceChildren(errore(e)); return; }
+  }
   if (!c.configurate) {
     area.replaceChildren(h('p', { class: 'muto piccolo' }, 'Non ancora configurate: servono le credenziali Firebase, dal menu del foglio.'));
     return;
@@ -1507,7 +1566,8 @@ async function disegnaInvioPush(area, idData) {
 
   let quando = 'Invio automatico spento.';
   try {
-    const st = await api('statoAttivatore');
+    const st = stato ? (stato.ok ? stato.dati : null) : await api('statoAttivatore');
+    if (!st) throw 'non disponibile';
     const accesi = (st.sabato || []).filter(r => r.attivo)
       .map(r => (st.giorni.find(g => g.id === r.giorno) || {}).nome + ' alle ' + ('0' + r.ora).slice(-2));
     if (accesi.length) quando = 'Partono da sole ' + accesi.join(' e ') + '.';
