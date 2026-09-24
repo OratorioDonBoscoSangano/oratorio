@@ -314,11 +314,32 @@
      con i sabati di oratorio */
   .sab.ev .data { background: var(--viola-tenue); color: var(--viola); }
   .sab.ev .data .n { font-size: 1.05rem; }
-  .sab .dettaglio {
-    padding: 2px 16px 14px 76px; margin-top: -4px;
-    border-bottom: 1px solid var(--linea); font-size: .9rem; color: var(--muto);
+  /* riga evento + scheda che si apre sotto */
+  .sab-riga { display: block; border-bottom: 1px solid var(--linea); }
+  .blocco-mese .sab-riga:last-child { border-bottom: 0; }
+  .sab-riga > .sab { border-bottom: 0; }
+  .sab-riga .vai { transition: transform .18s; }
+  .sab-riga.aperta .vai { transform: rotate(90deg); color: var(--viola); }
+  .sab-riga.aperta > .sab { background: var(--viola-tenue); }
+  .sab-riga.aperta > .sab .data,
+  .sab-riga.aperta > .sab .etichetta.viola { background: var(--superficie); }
+  .scheda-evento {
+    margin: 0 16px 14px; padding: 12px 14px; border-radius: var(--raggio-xs);
+    background: var(--superficie); border: 1.5px solid var(--viola-tenue);
+    display: grid; gap: 10px; font-size: .92rem;
   }
-  .sab-riga { display: block; }
+  .scheda-evento .voce { display: flex; align-items: flex-start; gap: 11px; }
+  .scheda-evento .voce .ico {
+    flex: none; width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--viola-tenue); color: var(--viola);
+  }
+  .scheda-evento .voce .ico svg { width: 17px; height: 17px; stroke-width: 2; }
+  .scheda-evento .voce .testo { padding-top: 5px; min-width: 0; overflow-wrap: anywhere; }
+  .scheda-evento .voce .testo small { display: block; color: var(--muto); font-size: .78rem; font-weight: 600; margin-bottom: 1px; }
+  .scheda-evento .voce.nota .testo { white-space: pre-line; }
+  .scheda-evento .azioni { margin-top: 2px; }
+  @media (prefers-reduced-motion: reduce) { .sab-riga .vai { transition: none; } }
   .etichetta.viola { background: var(--viola-tenue); color: var(--viola); }
 
   .legenda { display: flex; flex-wrap: wrap; gap: 14px; margin: 2px 0 16px; font-size: .8rem; color: var(--muto); }
@@ -396,7 +417,7 @@
    ===================================================================== */
 // Cambia a ogni modifica dell'interfaccia: compare in fondo alla scheda "Io",
 // così si capisce subito se il telefono sta eseguendo la versione aggiornata.
-const VERSIONE_APP = '2026.09.23b';
+const VERSIONE_APP = '2026.09.24';
 
 /* =====================================================================
    CONFIGURAZIONE
@@ -473,7 +494,11 @@ const ICONE = {
   gestione:  'M4 20l.9-3.6L15.3 6a1.8 1.8 0 0 1 2.6 0l.6.6a1.8 1.8 0 0 1 0 2.6L8.1 19.6zM13.8 7.6l2.6 2.6',
   admin:     'M5 7h9M17.5 7H19M5 12h3M11.5 12H19M5 17h9M17.5 17H19M15.5 7a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zM10 12a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zM15.5 17a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z',
   freccia:   'M6 9.5l6 6 6-6',
-  vai:       'M9 5.5l6.5 6.5L9 18.5'
+  vai:       'M9 5.5l6.5 6.5L9 18.5',
+  orologio:  'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3.2 2',
+  luogo:     'M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11zM12 12.4a2.4 2.4 0 1 0 0-4.8 2.4 2.4 0 0 0 0 4.8z',
+  giorno:    'M8 3v3M16 3v3M3.5 9.5h17M4.5 6.5h15a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-12a1 1 0 0 1 1-1z',
+  nota:      'M5 4.5h14a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-8l-4.5 3.5v-3.5H5a1 1 0 0 1-1-1v-10a1 1 0 0 1 1-1zM8 9h8M8 12.5h5'
 };
 
 function icona(nome, classe) {
@@ -1168,17 +1193,31 @@ function rigaEvento(e, oggi, dopoModifica) {
   const orario = e.oraInizio ? (e.oraInizio + (e.oraFine ? '–' + e.oraFine : '')) : 'tutto il giorno';
   const durata = e.piuGiorni ? ' · fino al ' + dataDaId(e.idDataFine).getDate() + ' ' + MESI[dataDaId(e.idDataFine).getMonth()] : '';
 
-  const dettaglio = h('div', { class: 'dettaglio nascosto' }, [
-    h('div', {}, orario + durata),
-    e.luogo ? h('div', {}, e.luogo) : null,
-    e.nota ? h('div', { style: 'margin-top:4px' }, e.nota) : null,
+  // scheda di dettaglio: una voce per riga, ciascuna col suo simbolo
+  const voce = (ico, titolo, testo, classe) => h('div', { class: 'voce' + (classe ? ' ' + classe : '') }, [
+    h('span', { class: 'ico' }, icona(ico)),
+    h('div', { class: 'testo' }, [h('small', {}, titolo), testo])
+  ]);
+  const giorni = e.piuGiorni
+    ? 'da ' + e.testo + ' a ' + e.testoFine
+    : e.testo;
+  const dettaglio = h('div', { class: 'scheda-evento nascosto' }, [
+    voce('giorno', e.piuGiorni ? 'Giorni' : 'Giorno', giorni),
+    voce('orologio', 'Orario', e.oraInizio ? (e.oraInizio + (e.oraFine ? ' – ' + e.oraFine : '')) : 'Tutto il giorno'),
+    e.luogo ? voce('luogo', 'Luogo', e.luogo) : null,
+    e.nota ? voce('nota', 'Note', e.nota, 'nota') : null,
     S.utente.livello >= 3
-      ? h('div', { class: 'azioni', style: 'margin-top:10px' },
+      ? h('div', { class: 'azioni' },
           h('button', { class: 'b secondario piccolo', onclick: ev => { ev.stopPropagation(); vai('gestione'); setTimeout(() => schermataGestione('eventi', e.id), 0); } }, 'Modifica'))
       : null
   ]);
 
-  const riga = h('button', { class: cl.join(' '), onclick: () => dettaglio.classList.toggle('nascosto') }, [
+  let contenitore;
+  const riga = h('button', { class: cl.join(' '), 'aria-expanded': 'false', onclick: () => {
+    const aperta = dettaglio.classList.toggle('nascosto') === false;
+    contenitore.classList.toggle('aperta', aperta);
+    riga.setAttribute('aria-expanded', aperta ? 'true' : 'false');
+  } }, [
     h('div', { class: 'data' }, [
       h('span', { class: 'n' }, d.getDate()),
       h('span', { class: 'g' }, GIORNI_BREVI[d.getDay()])
@@ -1192,7 +1231,8 @@ function rigaEvento(e, oggi, dopoModifica) {
     ]),
     icona('vai', 'vai')
   ]);
-  return h('div', { class: 'sab-riga' }, [riga, dettaglio]);
+  contenitore = h('div', { class: 'sab-riga' }, [riga, dettaglio]);
+  return contenitore;
 }
 
 const GIORNI_BREVI = ['dom', 'lun', 'mar', 'mer', 'gio', 'ven', 'sab'];
