@@ -184,6 +184,37 @@
   }
   .etichetta.ambra { background: var(--ambra-tenue); color: #7A5200; }
   .etichetta.rossa { background: var(--rosso-tenue); color: var(--rosso); }
+  .etichetta.verde { background: #E3F5EA; color: #19703F; }
+
+  /* volantini: anteprima a sinistra, dati e pulsanti a destra (sotto, sui telefoni stretti) */
+  .vol {
+    display: grid; grid-template-columns: 112px 1fr; gap: 14px; align-items: start;
+    background: var(--superficie); border: 1px solid var(--linea); border-radius: var(--raggio-s);
+    padding: 14px; margin: 10px 0; box-shadow: var(--ombra);
+  }
+  .vol.senza-file { grid-template-columns: 1fr; }
+  .vol-anteprima {
+    width: 112px; min-height: 112px; border-radius: var(--raggio-xs); overflow: hidden;
+    background: var(--fondo); display: flex; align-items: center; justify-content: center; text-align: center;
+  }
+  .vol-anteprima a { display: block; width: 100%; }
+  .vol-anteprima img { display: block; width: 100%; height: auto; }
+  .vol-pdf { display: flex !important; flex-direction: column; align-items: center; gap: 2px; padding: 22px 0; color: var(--rosso); text-decoration: none; }
+  .vol-pdf b { font-size: 1.3rem; }
+  .vol-pdf span { font-size: .8rem; color: var(--muto); }
+  .vol-info { min-width: 0; }
+  .vol-info .titolo { font-weight: 700; display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+  .vol-info .sotto { color: var(--muto); font-size: .86rem; margin-top: 3px; }
+  .vol-info .vol-ritardo { color: var(--rosso); font-weight: 650; }
+  .vol-registro { margin-top: 8px; font-size: .8rem; color: var(--muto); display: grid; gap: 2px; }
+  .vol-info .tendina { margin-top: 12px; }
+  .vol-carica input[type=file] { padding: 9px 12px; }
+  .vol-gestione { border-top: 1px solid var(--linea); padding-top: 12px; }
+  @media (max-width: 420px) {
+    .vol { grid-template-columns: 1fr; }
+    .vol-anteprima { width: 100%; min-height: 80px; max-height: 240px; }
+    .vol-anteprima img { max-height: 240px; object-fit: contain; }
+  }
 
   /* ============================================================
      CONTROLLI
@@ -417,7 +448,7 @@
    ===================================================================== */
 // Cambia a ogni modifica dell'interfaccia: compare in fondo alla scheda "Io",
 // così si capisce subito se il telefono sta eseguendo la versione aggiornata.
-const VERSIONE_APP = '2026.09.24';
+const VERSIONE_APP = '2026.09.28';
 
 /* =====================================================================
    CONFIGURAZIONE
@@ -830,6 +861,11 @@ function vistaSabato(d) {
         tendina('Attività e gioco libero', attivita.length + d.ricorrenti.length, dentro, mie)));
     }
   }
+  // volantini approvati per questo sabato, pronti da mandare sui gruppi
+  if (d.volantini && d.volantini.length) {
+    box.appendChild(h('h2', {}, 'Volantino'));
+    d.volantini.forEach(v => box.appendChild(schedaVolantinoPronto(v, null)));
+  }
   if (!d.prossimo) box.appendChild(h('div', { class: 'azioni' }, h('button', { class: 'b secondario', onclick: () => schermataSabato() }, 'Vai al prossimo sabato')));
   return box;
 }
@@ -1014,6 +1050,11 @@ async function schermataIo() {
     const l2 = h('div', { class: 'lista', style: 'margin-top:12px' });
     passati.forEach(i => l2.appendChild(rigaIncarico(i)));
     box.appendChild(h('div', { style: 'margin-top:10px' }, tendina('Incarichi passati', passati.length, l2)));
+  }
+
+  if (d.volantini && d.volantini.length) {
+    box.appendChild(h('h2', {}, 'I miei volantini'));
+    d.volantini.forEach(v => box.appendChild(v.condivisibile ? schedaVolantinoPronto(v, null) : schedaVolantinoLavoro(v, () => schermataIo(), false)));
   }
 
   if (d.squadre.length) {
@@ -1212,9 +1253,19 @@ function rigaEvento(e, oggi, dopoModifica) {
       : null
   ]);
 
+  // volantini dell'evento: le schede si creano alla prima apertura, così il
+  // calendario non scarica tutte le immagini appena lo si apre
+  const volantini = (S.volEventi || {})[e.id] || [];
+  let volantiniMessi = false;
+
   let contenitore;
   const riga = h('button', { class: cl.join(' '), 'aria-expanded': 'false', onclick: () => {
     const aperta = dettaglio.classList.toggle('nascosto') === false;
+    if (aperta && volantini.length && !volantiniMessi) {
+      volantiniMessi = true;
+      const prima = dettaglio.querySelector('.azioni');
+      volantini.forEach(v => dettaglio.insertBefore(schedaVolantinoPronto(v, null), prima));
+    }
     contenitore.classList.toggle('aperta', aperta);
     riga.setAttribute('aria-expanded', aperta ? 'true' : 'false');
   } }, [
@@ -1227,7 +1278,8 @@ function rigaEvento(e, oggi, dopoModifica) {
         e.titolo,
         e.categoria ? h('span', { class: 'etichetta viola' }, e.categoria) : null
       ]),
-      h('div', { class: 'secondaria' }, orario + durata + (e.luogo ? ' · ' + e.luogo : ''))
+      h('div', { class: 'secondaria' }, orario + durata + (e.luogo ? ' · ' + e.luogo : '') +
+        (((S.volEventi || {})[e.id] || []).length ? ' · volantino' : ''))
     ]),
     icona('vai', 'vai')
   ]);
@@ -1243,7 +1295,9 @@ async function schermataCalendario() {
   let c, ev;
   try {
     c = await caricaCalendario();
-    ev = (await api('eventi')).eventi;
+    const risposta = await api('eventi');
+    ev = risposta.eventi;
+    S.volEventi = risposta.volantini || {};
   } catch (e) { mostra(errore(e)); return; }
   if (!c.sabati.length) { mostra(vuoto('Calendario vuoto.')); return; }
 
@@ -1442,10 +1496,338 @@ async function apriGioco(id) {
 /* =====================================================================
    SCHERMATA 6 — GESTIONE (Responsabili)
    ===================================================================== */
+/* =====================================================================
+   VOLANTINI
+   Percorso: Da fare → Da approvare → Approvato (o Da correggere) → Pubblicato.
+   Il file viaggia in base64 e resta in memoria per tutta la sessione, così
+   il pulsante "Condividi" parte subito: i telefoni permettono la
+   condivisione solo come risposta immediata a un tocco.
+   ===================================================================== */
+const COLORE_STATO_VOL = { 'Da fare': '', 'Da approvare': 'ambra', 'Da correggere': 'rossa', 'Approvato': 'verde', 'Pubblicato': 'verde' };
+function etichettaStatoVol(v) { return h('span', { class: 'etichetta ' + (COLORE_STATO_VOL[v.stato] || '') }, v.stato.toLowerCase()); }
+
+/** Scarica (una volta sola) il file di un volantino e lo tiene pronto. */
+function prendiFileVolantino(id) {
+  S.fileVol = S.fileVol || {};
+  S.fileVolPronti = S.fileVolPronti || {};
+  if (!S.fileVol[id]) {
+    S.fileVol[id] = api('fileVolantino', { id }).then(f => {
+      const bin = atob(f.dati);
+      const byte = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) byte[i] = bin.charCodeAt(i);
+      const file = new File([byte], f.nome, { type: f.tipo });
+      const pronto = { file, url: URL.createObjectURL(file) };
+      S.fileVolPronti[id] = pronto;
+      return pronto;
+    }).catch(e => { delete S.fileVol[id]; throw e; });
+  }
+  return S.fileVol[id];
+}
+function dimenticaFileVolantino(id) {
+  if (S.fileVolPronti && S.fileVolPronti[id]) URL.revokeObjectURL(S.fileVolPronti[id].url);
+  if (S.fileVol) delete S.fileVol[id];
+  if (S.fileVolPronti) delete S.fileVolPronti[id];
+}
+
+/** Anteprima: l'immagine, oppure un riquadro "PDF" che apre il documento. */
+function anteprimaVolantino(v) {
+  const box = h('div', { class: 'vol-anteprima' }, h('span', { class: 'muto piccolo' }, 'Carico l\'anteprima…'));
+  if (!v.haFile) { box.replaceChildren(h('span', { class: 'muto piccolo' }, 'Nessun file')); return box; }
+  prendiFileVolantino(v.id).then(({ file, url }) => {
+    if (file.type === 'application/pdf') {
+      box.replaceChildren(h('a', { class: 'vol-pdf', href: url, target: '_blank', rel: 'noopener' }, [h('b', {}, 'PDF'), h('span', {}, 'Apri')]));
+    } else {
+      box.replaceChildren(h('a', { href: url, target: '_blank', rel: 'noopener', title: 'Apri a tutto schermo' },
+        h('img', { src: url, alt: 'Volantino: ' + v.titolo, loading: 'lazy' })));
+    }
+  }).catch(e => box.replaceChildren(h('span', { class: 'piccolo', style: 'color:var(--rosso)' }, String(e))));
+  return box;
+}
+
+/**
+ * Condivide il file con il menu del telefono (WhatsApp compreso). Dove non si
+ * può (per esempio da computer) lo scarica. Poi lo segna come pubblicato.
+ */
+function condividiVolantino(v, dopo) {
+  const pronto = S.fileVolPronti && S.fileVolPronti[v.id];
+  if (!pronto) { toast('Un attimo: il volantino si sta ancora caricando', true); return; }
+  const segna = () => api('segnaPubblicato', { id: v.id }).then(() => dopo && dopo()).catch(() => {});
+  const dati = { files: [pronto.file], title: v.titolo };
+  if (navigator.canShare && navigator.canShare(dati)) {
+    navigator.share(dati).then(segna).catch(e => {
+      if (e && e.name === 'AbortError') return;   // chiuso senza condividere
+      toast('Condivisione non riuscita: prova con "Scarica"', true);
+    });
+  } else {
+    scaricaVolantino(v);
+    toast('Scaricato: ora mandalo sul gruppo');
+    segna();
+  }
+}
+function scaricaVolantino(v) {
+  const pronto = S.fileVolPronti && S.fileVolPronti[v.id];
+  if (!pronto) return;
+  const a = h('a', { href: pronto.url, download: pronto.file.name, style: 'display:none' });
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
+/** Riga "approvato da… · pubblicato da…": il registro di chi ha fatto cosa. */
+function registroVolantino(v) {
+  const parti = [];
+  if (v.caricatoDa) parti.push('Caricato da ' + v.caricatoDa + (v.caricatoIl ? ' il ' + v.caricatoIl.slice(0, 10) : ''));
+  if (v.approvatoDa) parti.push('Approvato da ' + v.approvatoDa + (v.approvatoIl ? ' il ' + v.approvatoIl.slice(0, 10) : ''));
+  if (v.pubblicatoDa) parti.push('Condiviso per primo da ' + v.pubblicatoDa + (v.condivisioni > 1 ? ' (' + v.condivisioni + ' volte in tutto)' : ''));
+  return parti.length ? h('div', { class: 'vol-registro' }, parti.map(p => h('div', {}, p))) : null;
+}
+
+/** Scheda di un volantino pronto: anteprima, chi l'ha approvato, Condividi. */
+function schedaVolantinoPronto(v, dopo) {
+  const btn = h('button', { class: 'b', onclick: () => condividiVolantino(v, dopo) }, 'Condividi');
+  const scarica = h('button', { class: 'b secondario piccolo', onclick: () => scaricaVolantino(v) }, 'Scarica');
+  btn.disabled = true; scarica.disabled = true;
+  prendiFileVolantino(v.id).then(() => { btn.disabled = false; scarica.disabled = false; }).catch(() => {});
+  return h('div', { class: 'vol' }, [
+    anteprimaVolantino(v),
+    h('div', { class: 'vol-info' }, [
+      h('div', { class: 'titolo' }, [v.titolo, etichettaStatoVol(v)]),
+      registroVolantino(v),
+      h('div', { class: 'azioni' }, [btn, scarica])
+    ])
+  ]);
+}
+
+/** Legge un file come base64 (senza il prefisso "data:…;base64,"). */
+function leggiBase64(file) {
+  return new Promise((ok, ko) => {
+    const r = new FileReader();
+    r.onload = () => ok(String(r.result).split(',')[1] || '');
+    r.onerror = () => ko('Non riesco a leggere il file.');
+    r.readAsDataURL(file);
+  });
+}
+
+/** Le foto molto pesanti si riducono prima di spedirle: si carica prima e WhatsApp le comprime comunque. */
+async function alleggerisciImmagine(file) {
+  if (!/^image\/(jpeg|png|webp)$/.test(file.type) || file.size <= 2.5 * 1024 * 1024 || !window.createImageBitmap) return file;
+  try {
+    const img = await createImageBitmap(file);
+    const k = Math.min(1, 2400 / Math.max(img.width, img.height));
+    const c = document.createElement('canvas');
+    c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+    ctx.drawImage(img, 0, 0, c.width, c.height);
+    const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.88));
+    return blob ? new File([blob], file.name.replace(/\.\w+$/, '') + '.jpg', { type: 'image/jpeg' }) : file;
+  } catch (e) { return file; }
+}
+
+/** Scelta del file + casella foto di bambini + pulsante Carica. */
+function caricatoreVolantino(v, dopo) {
+  const input = h('input', { type: 'file', accept: 'image/jpeg,image/png,image/webp,application/pdf', class: 'vol-file' });
+  const foto = h('input', { type: 'checkbox' });
+  foto.checked = !!v.fotoMinori;
+  const esito = h('div');
+  const btn = h('button', { class: 'b', onclick: async () => {
+    const f = input.files && input.files[0];
+    if (!f) { esito.replaceChildren(errore('Scegli prima il file del volantino.')); return; }
+    if (['image/jpeg', 'image/png', 'image/webp', 'application/pdf'].indexOf(f.type) < 0) {
+      esito.replaceChildren(errore('Formato non accettato: esporta il volantino come JPG, PNG o PDF.')); return;
+    }
+    if (v.stato === 'Approvato' && !confirm('È già approvato: la nuova versione dovrà essere riapprovata. Continuo?')) return;
+    btn.disabled = true;
+    esito.replaceChildren(h('p', { class: 'muto piccolo' }, 'Carico…'));
+    try {
+      const leggero = await alleggerisciImmagine(f);
+      if (leggero.size > 10 * 1024 * 1024) throw 'Il file supera i 10 MB: esportalo più leggero.';
+      const dati = await leggiBase64(leggero);
+      await api('caricaVolantino', { id: v.id, tipo: leggero.type, dati, fotoMinori: foto.checked });
+      dimenticaFileVolantino(v.id);
+      toast('Caricato: ora deve approvarlo un Responsabile');
+      if (dopo) dopo();
+    } catch (e) { esito.replaceChildren(errore(e)); btn.disabled = false; }
+  } }, v.haFile ? 'Carica la nuova versione' : 'Carica il volantino');
+  return h('div', { class: 'vol-carica' }, [
+    h('label', {}, 'File del volantino (immagine o PDF)'), input,
+    h('label', {}, [foto, 'Ci sono foto di bambini riconoscibili']),
+    h('div', { class: 'azioni' }, btn), esito
+  ]);
+}
+
+/** Scheda di un volantino da preparare o in lavorazione (Io e Gestione). */
+function schedaVolantinoLavoro(v, dopo, conGestione) {
+  const corpo = h('div', { class: 'vol-info' }, [
+    h('div', { class: 'titolo' }, [v.titolo, etichettaStatoVol(v)]),
+    h('div', { class: 'sotto' }, v.etichetta),
+    h('div', { class: 'sotto' + (v.inRitardo ? ' vol-ritardo' : '') },
+      (conGestione ? (v.incaricato ? 'Lo prepara ' + v.incaricato : 'Nessuno incaricato') + ' · ' : '') +
+      (v.scadenzaBreve ? (v.inRitardo ? 'in ritardo, scadeva il ' : 'entro il ') + v.scadenzaBreve : 'senza scadenza')),
+    v.stato === 'Da correggere' && v.note ? h('div', { class: 'avviso', style: 'margin:10px 0 0' }, [h('b', {}, 'Da correggere: '), v.note])
+      : (v.note ? h('div', { class: 'sotto' }, v.note) : null),
+    v.stato === 'Da approvare' ? h('div', { class: 'sotto' }, 'In attesa che un Responsabile lo approvi.') : null,
+    registroVolantino(v)
+  ]);
+  const puoCaricare = v.mio || S.utente.livello >= 3;
+  const riquadro = h('div', { class: 'vol' + (v.haFile ? '' : ' senza-file') }, [v.haFile ? anteprimaVolantino(v) : null, corpo]);
+  if (puoCaricare && v.stato !== 'Pubblicato') {
+    corpo.appendChild(tendina(v.haFile ? 'Carica una nuova versione' : 'Carica il volantino', null, caricatoreVolantino(v, dopo), !v.haFile && v.mio));
+  }
+  return riquadro;
+}
+
+/** Riquadro di approvazione per i Responsabili. */
+function schedaVolantinoApprova(v, dopo) {
+  const corpo = h('div', { class: 'vol-info' });
+  const liberatorie = h('input', { type: 'checkbox' });
+  const esito = h('div');
+  const approva = h('button', { class: 'b', onclick: async () => {
+    if (v.fotoMinori && !liberatorie.checked) { esito.replaceChildren(errore('Prima conferma di aver verificato le liberatorie.')); return; }
+    approva.disabled = true;
+    try {
+      await api('approvaVolantino', { id: v.id, liberatorie: liberatorie.checked });
+      toast('Approvato');
+      dopo();
+    } catch (e) { esito.replaceChildren(errore(e)); approva.disabled = false; }
+  } }, 'Approva');
+  const rimanda = h('button', { class: 'b secondario', onclick: () => {
+    const nota = h('textarea', { placeholder: 'Cosa va corretto? (per esempio: manca l\'orario)' });
+    const conferma = h('button', { class: 'b pericolo', onclick: async () => {
+      if (!nota.value.trim()) { esito.replaceChildren(errore('Scrivi cosa va corretto.')); return; }
+      conferma.disabled = true;
+      try {
+        await api('rimandaVolantino', { id: v.id, nota: nota.value });
+        toast('Rimandato a ' + (v.incaricato || 'chi lo prepara'));
+        dopo();
+      } catch (e) { esito.replaceChildren(errore(e)); conferma.disabled = false; }
+    } }, 'Rimanda indietro');
+    esito.replaceChildren(h('div', {}, [h('label', {}, 'Nota per chi lo prepara'), nota, h('div', { class: 'azioni' }, conferma)]));
+    nota.focus();
+  } }, 'Da correggere');
+
+  corpo.append(
+    h('div', { class: 'titolo' }, [v.titolo, etichettaStatoVol(v)]),
+    h('div', { class: 'sotto' }, v.etichetta + (v.incaricato ? ' · lo prepara ' + v.incaricato : '')),
+    registroVolantino(v),
+    v.fotoMinori ? h('div', { class: 'avviso', style: 'margin:10px 0 0' }, [
+      h('div', { style: 'font-weight:700;margin-bottom:4px' }, 'Contiene foto di bambini riconoscibili'),
+      h('label', { style: 'margin:0' }, [liberatorie, 'Ho verificato le liberatorie delle famiglie'])
+    ]) : null,
+    h('p', { class: 'piccolo muto', style: 'margin:10px 0 0' }, 'Controlla date, orari e luogo prima di approvare: il tuo nome resterà scritto sul volantino.'),
+    h('div', { class: 'azioni' }, [approva, rimanda]),
+    esito
+  );
+  return h('div', { class: 'vol' }, [anteprimaVolantino(v), corpo]);
+}
+
+/** Modulo nuovo / modifica (Responsabili). */
+async function moduloVolantino(d, v, dopo, annulla) {
+  const animatori = await caricaAnimatori();
+  const opzioni = [{ v: '', t: 'Scegli…' }]
+    .concat(d.sabati.map(s => ({ v: s.v, t: s.t })))
+    .concat(d.eventi.map(e => ({ v: e.v, t: 'Evento: ' + e.t })));
+  // se il riferimento è già passato non è fra le scelte: lo si aggiunge
+  if (v && !opzioni.some(o => o.v === v.riferimento)) opzioni.push({ v: v.riferimento, t: v.etichetta });
+  const rif = select(opzioni, v ? v.riferimento : '');
+  const titolo = h('input', { type: 'text', value: v ? v.titolo : '', placeholder: 'Per esempio: Castagnata 2026' });
+  let titoloToccato = !!v;
+  titolo.addEventListener('input', () => { titoloToccato = true; });
+  const incaricato = select([{ v: '', t: 'Nessuno per ora' }].concat(animatori.map(a => ({ v: a.id, t: a.nomeVis }))), v ? v.idIncaricato : '');
+  const iso = id => id && id.length === 8 ? id.slice(0, 4) + '-' + id.slice(4, 6) + '-' + id.slice(6, 8) : '';
+  const scadenza = h('input', { type: 'date', value: v ? iso(v.scadenza) : '' });
+  const note = h('textarea', { placeholder: 'Indicazioni per chi lo prepara (facoltativo)' }, v && v.stato !== 'Da correggere' ? v.note : '');
+
+  // scegliendo cosa pubblicizzare si propongono titolo e scadenza (una settimana prima)
+  rif.addEventListener('change', () => {
+    const s = d.sabati.find(x => x.v === rif.value) || d.eventi.find(x => x.v === rif.value);
+    if (!s) return;
+    if (!titoloToccato) titolo.value = s.titolo;
+    if (!scadenza.value) {
+      const t = dataDaId(s.idData); t.setDate(t.getDate() - 7);
+      let id = t.getFullYear() + ('0' + (t.getMonth() + 1)).slice(-2) + ('0' + t.getDate()).slice(-2);
+      if (id < d.oggi) id = d.oggi;
+      scadenza.value = iso(id);
+    }
+  });
+
+  const esito = h('div');
+  const salva = h('button', { class: 'b', onclick: async () => {
+    salva.disabled = true;
+    try {
+      await api('salvaVolantino', { id: v ? v.id : '', riferimento: rif.value, titolo: titolo.value,
+        idIncaricato: incaricato.value, scadenza: scadenza.value.replace(/-/g, ''), note: note.value });
+      toast(v ? 'Volantino aggiornato' : 'Volantino creato' + (incaricato.value ? ': ho avvisato chi lo prepara' : ''));
+      dopo();
+    } catch (e) { esito.replaceChildren(errore(e)); salva.disabled = false; }
+  } }, v ? 'Salva' : 'Crea');
+
+  return h('div', { class: 'modulo' }, [
+    h('div', { class: 'titolo' }, v ? 'Modifica volantino' : 'Nuovo volantino'),
+    h('label', {}, 'Cosa pubblicizza'), rif,
+    h('label', {}, 'Titolo'), titolo,
+    h('label', {}, 'Chi lo prepara'), incaricato,
+    h('label', {}, 'Da caricare entro'), scadenza,
+    h('label', {}, 'Note'), note,
+    h('div', { class: 'azioni' }, [salva, h('button', { class: 'b secondario', onclick: annulla }, 'Annulla')]),
+    esito
+  ]);
+}
+
+/** Gestione → Volantini. */
+async function gestioneVolantini(cont) {
+  const d = await api('volantini');
+  const ricarica = () => schermataGestione('volantini');
+  const area = h('div');
+
+  function disegna() {
+    const daApprovare = d.volantini.filter(v => v.stato === 'Da approvare');
+    const inLavoro = d.volantini.filter(v => v.stato === 'Da fare' || v.stato === 'Da correggere');
+    const pronti = d.volantini.filter(v => v.condivisibile);
+    const oggi = d.oggi;
+    const vecchi = pronti.filter(v => v.idDataRif && v.idDataRif < oggi);
+    const attuali = pronti.filter(v => !(v.idDataRif && v.idDataRif < oggi));
+
+    const conAzioni = (v, scheda) => {
+      scheda.querySelector('.vol-info').appendChild(h('div', { class: 'azioni vol-gestione' }, [
+        h('button', { class: 'b secondario piccolo', onclick: async () => {
+          area.replaceChildren(await moduloVolantino(d, v, ricarica, disegna)); window.scrollTo(0, 0);
+        } }, 'Modifica'),
+        h('button', { class: 'b pericolo piccolo', onclick: async () => {
+          if (!confirm('Eliminare "' + v.titolo + '"? Anche il file finirà nel cestino di Drive.')) return;
+          try { await api('eliminaVolantino', { id: v.id }); toast('Eliminato'); ricarica(); } catch (e) { toast(String(e), true); }
+        } }, 'Elimina')
+      ]));
+      return scheda;
+    };
+
+    area.replaceChildren(
+      h('div', { class: 'azioni', style: 'margin-top:0' }, h('button', { class: 'b', onclick: async () => {
+        area.replaceChildren(await moduloVolantino(d, null, ricarica, disegna)); window.scrollTo(0, 0);
+      } }, '+ Nuovo volantino')),
+
+      h('h2', {}, 'Da approvare' + (daApprovare.length ? ' (' + daApprovare.length + ')' : '')),
+      daApprovare.length ? h('div', {}, daApprovare.map(v => conAzioni(v, schedaVolantinoApprova(v, ricarica))))
+        : vuoto('Niente da approvare.'),
+
+      h('h2', {}, 'In preparazione' + (inLavoro.length ? ' (' + inLavoro.length + ')' : '')),
+      inLavoro.length ? h('div', {}, inLavoro.map(v => conAzioni(v, schedaVolantinoLavoro(v, ricarica, true))))
+        : vuoto('Nessun volantino in preparazione.'),
+
+      h('h2', {}, 'Pronti da condividere' + (attuali.length ? ' (' + attuali.length + ')' : '')),
+      attuali.length ? h('div', {}, attuali.map(v => conAzioni(v, schedaVolantinoPronto(v, null))))
+        : vuoto('Ancora nessuno.'),
+
+      vecchi.length ? h('div', { style: 'margin-top:12px' }, tendina('Già passati', vecchi.length,
+        h('div', {}, vecchi.map(v => conAzioni(v, schedaVolantinoLavoro(v, ricarica, true)))))) : null
+    );
+  }
+  disegna();
+  cont.replaceChildren(area);
+}
+
 async function schermataGestione(scheda, apri) {
   scheda = scheda || 'programma';
   const tab = h('div', { class: 'schede' }, [
-    ['programma', 'Programma'], ['promemoria', 'Promemoria'], ['eventi', 'Eventi'],
+    ['programma', 'Programma'], ['promemoria', 'Promemoria'], ['volantini', 'Volantini'], ['eventi', 'Eventi'],
     ['estate', 'Estate'], ['contatti', 'Contatti'], ['cruscotto', 'Cruscotto']
   ].map(t => h('button', { class: t[0] === scheda ? 'on' : '', onclick: () => schermataGestione(t[0]) }, t[1])));
   const contenuto = h('div', {}, h('p', { class: 'muto' }, 'Carico…'));
@@ -1454,6 +1836,7 @@ async function schermataGestione(scheda, apri) {
     if (scheda === 'programma') await gestioneProgramma(contenuto);
     else if (scheda === 'promemoria') await gestionePromemoria(contenuto);
     else if (scheda === 'eventi') await gestioneEventi(contenuto, apri);
+    else if (scheda === 'volantini') await gestioneVolantini(contenuto);
     else if (scheda === 'estate') await gestioneEstate(contenuto);
     else if (scheda === 'contatti') await gestioneContatti(contenuto);
     else await gestioneCruscotto(contenuto);
@@ -1999,13 +2382,22 @@ async function adminNotifiche(cont) {
   const evAnticipo = select([{ v: '0', t: 'lo stesso giorno' }, { v: '1', t: 'il giorno prima' },
     { v: '2', t: 'due giorni prima' }, { v: '3', t: 'tre giorni prima' }], String(st.eventi.anticipo || 1));
 
+  // promemoria a chi deve preparare un volantino
+  const vo = st.volantini || { ora: 18, anticipo: 2, attivo: false };
+  const volAttivo = h('input', { type: 'checkbox' });
+  volAttivo.checked = !!vo.attivo;
+  const volOra = select(ore, String(vo.ora));
+  const volAnticipo = select([{ v: '1', t: 'il giorno prima' }, { v: '2', t: 'due giorni prima' },
+    { v: '3', t: 'tre giorni prima' }, { v: '5', t: 'cinque giorni prima' }, { v: '7', t: 'una settimana prima' }], String(vo.anticipo || 2));
+
   const esito = h('div');
   const salva = h('button', { class: 'b', onclick: async () => {
     salva.disabled = true;
     try {
       const r = await api('programmaPromemoria', {
         sabato: righe.map(x => ({ giorno: x.giorno.value, ora: x.ora.value, attivo: x.attivo.checked })),
-        eventi: { ora: evOra.value, anticipo: evAnticipo.value, attivo: evAttivo.checked }
+        eventi: { ora: evOra.value, anticipo: evAnticipo.value, attivo: evAttivo.checked },
+        volantini: { ora: volOra.value, anticipo: volAnticipo.value, attivo: volAttivo.checked }
       });
       toast('Orari salvati');
       schermataAdmin('notifiche');
@@ -2040,6 +2432,16 @@ async function adminNotifiche(cont) {
       h('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:10px' }, [
         h('div', {}, [h('label', {}, 'Quando'), evAnticipo]),
         h('div', {}, [h('label', {}, 'Ora'), evOra])
+      ])
+    ]),
+
+    h('h2', {}, 'Volantini'),
+    h('p', { class: 'muto piccolo' }, 'Arrivano solo a chi deve preparare un volantino non ancora caricato: prima della scadenza, il giorno stesso e se è in ritardo. Gli avvisi di approvazione partono comunque, subito.'),
+    h('div', { class: 'modulo' }, [
+      h('label', {}, [volAttivo, 'Attivo']),
+      h('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:10px' }, [
+        h('div', {}, [h('label', {}, 'Primo avviso'), volAnticipo]),
+        h('div', {}, [h('label', {}, 'Ora'), volOra])
       ])
     ]),
 
