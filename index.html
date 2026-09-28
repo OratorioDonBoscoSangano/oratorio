@@ -186,6 +186,21 @@
   .etichetta.rossa { background: var(--rosso-tenue); color: var(--rosso); }
   .etichetta.verde { background: #E3F5EA; color: #19703F; }
 
+  /* PIN da mandare in privato */
+  .pin-testa { display: flex; justify-content: space-between; align-items: center; font-weight: 700; margin: 16px 0 6px; }
+  .pin-testa .conta { font-size: .82rem; color: var(--muto); font-weight: 650; }
+  .pin-riga {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 10px; justify-content: space-between;
+    background: var(--superficie); border: 1px solid var(--linea); border-radius: var(--raggio-s);
+    padding: 10px 14px; margin: 8px 0;
+  }
+  .pin-riga > div:last-child:not(.pin-azioni) { flex-basis: 100%; }
+  .pin-nome { font-weight: 650; }
+  .pin-codice { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 1.15rem; letter-spacing: .15em; color: var(--blu-scuro); }
+  .pin-azioni { display: flex; gap: 8px; align-items: center; }
+  .pin-riga.fatto { background: #F0FAF4; border-color: #BFE5CD; }
+  .pin-riga.fatto .pin-nome::after { content: ' ✓'; color: #19703F; }
+
   /* volantini: anteprima a sinistra, dati e pulsanti a destra (sotto, sui telefoni stretti) */
   .vol {
     display: grid; grid-template-columns: 112px 1fr; gap: 14px; align-items: start;
@@ -232,6 +247,7 @@
   .b.piccolo { min-height: 38px; padding: 0 15px; font-size: .86rem; }
   .b:disabled { opacity: .45; cursor: default; }
   .b.largo { width: 100%; }
+  a.b { text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
   @media (prefers-reduced-motion: reduce) { .b { transition: none; } }
 
   label { display: block; font-size: .82rem; font-weight: 600; color: var(--muto); margin: 14px 0 5px; }
@@ -448,7 +464,7 @@
    ===================================================================== */
 // Cambia a ogni modifica dell'interfaccia: compare in fondo alla scheda "Io",
 // così si capisce subito se il telefono sta eseguendo la versione aggiornata.
-const VERSIONE_APP = '2026.09.28';
+const VERSIONE_APP = '2026.09.29';
 
 /* =====================================================================
    CONFIGURAZIONE
@@ -1077,7 +1093,8 @@ async function schermataIo() {
   disegnaNotifiche(areaNotifiche);
 
   box.appendChild(h('div', { class: 'azioni', style: 'margin-top:28px' }, h('button', { class: 'b secondario', onclick: esci }, 'Esci')));
-  box.appendChild(h('p', { class: 'muto piccolo', style: 'text-align:center;margin-top:18px' }, 'Versione ' + VERSIONE_APP));
+  box.appendChild(h('p', { class: 'muto piccolo', style: 'text-align:center;margin-top:18px' }, [
+    h('a', { href: URL_SITO + 'guida.html', target: '_blank', rel: 'noopener' }, 'Come funziona l\'app'), ' · Versione ' + VERSIONE_APP]));
   mostra(box);
 }
 
@@ -1190,8 +1207,8 @@ async function disegnaNotifiche(area) {
   area.replaceChildren(h('div', { class: 'modulo' }, [
     h('div', { class: 'titolo' }, attive ? 'Attive su questo telefono' : 'Non attive su questo telefono'),
     h('p', { class: 'muto piccolo' }, attive
-      ? 'Il giovedì sera ricevi il promemoria di quello che ti tocca sabato.'
-      : 'Attivandole ricevi il giovedì sera il promemoria di quello che ti tocca sabato.'),
+      ? 'Prima di ogni sabato ricevi il promemoria di quello che ti tocca.'
+      : 'Attivandole ricevi prima di ogni sabato il promemoria di quello che ti tocca.'),
     stato.dispositivi > 1 ? h('p', { class: 'muto piccolo' }, 'Le hai attive su ' + stato.dispositivi + ' dispositivi.') : null,
     h('div', { class: 'azioni' }, btn)
   ]));
@@ -1678,13 +1695,12 @@ function schedaVolantinoLavoro(v, dopo, conGestione) {
 /** Riquadro di approvazione per i Responsabili. */
 function schedaVolantinoApprova(v, dopo) {
   const corpo = h('div', { class: 'vol-info' });
-  const liberatorie = h('input', { type: 'checkbox' });
   const esito = h('div');
   const approva = h('button', { class: 'b', onclick: async () => {
-    if (v.fotoMinori && !liberatorie.checked) { esito.replaceChildren(errore('Prima conferma di aver verificato le liberatorie.')); return; }
     approva.disabled = true;
     try {
-      await api('approvaVolantino', { id: v.id, liberatorie: liberatorie.checked });
+      // approvando si conferma anche il controllo delle liberatorie, se servono
+      await api('approvaVolantino', { id: v.id, liberatorie: true });
       toast('Approvato');
       dopo();
     } catch (e) { esito.replaceChildren(errore(e)); approva.disabled = false; }
@@ -1705,14 +1721,10 @@ function schedaVolantinoApprova(v, dopo) {
   } }, 'Da correggere');
 
   corpo.append(
-    h('div', { class: 'titolo' }, [v.titolo, etichettaStatoVol(v)]),
+    h('div', { class: 'titolo' }, [v.titolo, etichettaStatoVol(v),
+      v.fotoMinori ? h('span', { class: 'etichetta' }, 'foto di bambini') : null]),
     h('div', { class: 'sotto' }, v.etichetta + (v.incaricato ? ' · lo prepara ' + v.incaricato : '')),
     registroVolantino(v),
-    v.fotoMinori ? h('div', { class: 'avviso', style: 'margin:10px 0 0' }, [
-      h('div', { style: 'font-weight:700;margin-bottom:4px' }, 'Contiene foto di bambini riconoscibili'),
-      h('label', { style: 'margin:0' }, [liberatorie, 'Ho verificato le liberatorie delle famiglie'])
-    ]) : null,
-    h('p', { class: 'piccolo muto', style: 'margin:10px 0 0' }, 'Controlla date, orari e luogo prima di approvare: il tuo nome resterà scritto sul volantino.'),
     h('div', { class: 'azioni' }, [approva, rimanda]),
     esito
   );
@@ -2319,30 +2331,84 @@ async function schermataAdmin(scheda) {
   } catch (e) { cont.replaceChildren(errore(e)); }
 }
 
+/** Indirizzo dell'app da mettere nei messaggi (quello del sito, anche se si è dentro Apps Script). */
+const URL_SITO = 'https://oratoriodonboscosangano.github.io/oratorio/';
+
+/** Messaggio personale con tutto il necessario per il primo accesso. */
+function messaggioPin(x) {
+  return 'Ciao ' + x.nomeVis + '! Ecco il tuo accesso all\'app dell\'oratorio 📲\n\n' +
+    'App: ' + URL_SITO + '\n' +
+    (S.codice ? 'Codice oratorio: ' + S.codice + '\n' : '') +
+    'Il tuo PIN: ' + x.pin + '\n\n' +
+    'Apri il link, scrivi il codice, scegli il tuo nome e metti il PIN. ' +
+    'Il PIN è solo tuo: non girarlo a nessuno.\n' +
+    'Come funziona: ' + URL_SITO + 'guida.html';
+}
+
+/**
+ * Elenco dei PIN appena creati: per ciascuno un pulsante che apre la sua chat
+ * WhatsApp con il messaggio già scritto. Chi è già stato avvisato diventa verde.
+ * I PIN esistono solo in questa schermata: chiudendola non si recuperano più.
+ */
+function elencoPinDaMandare(lista) {
+  const fatti = h('span', { class: 'conta' });
+  let inviati = 0;
+  const aggiorna = () => {
+    fatti.textContent = inviati + ' di ' + lista.length + ' mandati';
+    window.onbeforeunload = inviati < lista.length ? () => 'I PIN non sono ancora stati mandati a tutti.' : null;
+  };
+  aggiorna();
+  const righe = lista.map(x => {
+    const riga = h('div', { class: 'pin-riga' });
+    const segna = () => { if (!riga.classList.contains('fatto')) { riga.classList.add('fatto'); inviati++; aggiorna(); } };
+    const areaCopia = h('div');
+    riga.append(
+      h('div', { class: 'pin-chi' }, [h('div', { class: 'pin-nome' }, x.nomeVis), h('div', { class: 'pin-codice' }, x.pin)]),
+      h('div', { class: 'pin-azioni' }, [
+        x.telefono
+          ? h('a', { class: 'b piccolo', href: linkWhatsApp(x.telefono, messaggioPin(x)), target: '_blank', rel: 'noopener', onclick: segna }, 'WhatsApp')
+          : h('span', { class: 'etichetta rossa' }, 'senza numero'),
+        h('button', { class: 'b secondario piccolo', onclick: () => { copiaTesto(messaggioPin(x), areaCopia); segna(); } }, 'Copia')
+      ]),
+      areaCopia
+    );
+    return riga;
+  });
+  return h('div', {}, [
+    h('div', { class: 'avviso' }, [
+      h('b', {}, 'Non chiudere questa schermata finché non hai finito: '),
+      'i PIN non si possono rivedere. Ogni pulsante apre la chat privata della persona con link, codice e PIN già scritti.'
+    ]),
+    h('div', { class: 'pin-testa' }, [h('span', {}, 'PIN da mandare'), fatti]),
+    ...righe
+  ]);
+}
+
 async function adminPin(cont) {
   await caricaAnimatori();
   const esito = h('div');
-  const gen = h('button', { class: 'b', onclick: async () => {
-    gen.disabled = true;
+  async function genera(tutti) {
+    if (tutti && !confirm('Rifare il PIN a TUTTI gli animatori attivi? Quelli vecchi smetteranno di funzionare e chi è già dentro l\'app resta collegato.')) return;
+    gen.disabled = true; genTutti.disabled = true;
     try {
-      const r = await api('generaPin');
-      esito.replaceChildren(r.length
-        ? h('div', {}, [h('div', { class: 'avviso' }, 'Copia questi PIN adesso: non saranno più visibili.'), h('div', { class: 'pinlista' }, r.map(x => x.nomeVis.padEnd(18) + x.pin).join('\n'))])
-        : h('p', { class: 'muto' }, 'Tutti gli animatori attivi hanno già un PIN.'));
+      const r = await api('generaPin', { tutti });
+      esito.replaceChildren(r.length ? elencoPinDaMandare(r) : h('p', { class: 'muto' }, 'Tutti gli animatori attivi hanno già un PIN.'));
     } catch (e) { esito.replaceChildren(errore(e)); }
-    gen.disabled = false;
-  } }, 'Genera PIN mancanti');
+    gen.disabled = false; genTutti.disabled = false;
+  }
+  const gen = h('button', { class: 'b', onclick: () => genera(false) }, 'Genera i PIN mancanti');
+  const genTutti = h('button', { class: 'b pericolo', onclick: () => genera(true) }, 'Rifai i PIN per tutti');
   const sel = select([{ v: '', t: 'Scegli animatore' }].concat(S.animatori.map(a => ({ v: a.id, t: a.nomeVis }))), '');
   const esitoReset = h('div');
   const reset = h('button', { class: 'b secondario', onclick: async () => {
     if (!sel.value || !confirm('Generare un nuovo PIN? Quello vecchio smetterà di funzionare.')) return;
-    try { const r = await api('resetPin', { idAnimatore: sel.value }); esitoReset.replaceChildren(h('div', { class: 'pinlista' }, r.nomeVis + '\t' + r.pin)); }
+    try { const r = await api('resetPin', { idAnimatore: sel.value }); esitoReset.replaceChildren(elencoPinDaMandare([r])); }
     catch (e) { esitoReset.replaceChildren(errore(e)); }
-  } }, 'Reset PIN');
+  } }, 'Nuovo PIN');
   cont.replaceChildren(
-    h('p', {}, 'Crea un PIN per chi non ce l\'ha ancora. I PIN non sono recuperabili: si possono solo rigenerare.'),
-    gen, esito,
-    h('h3', { style: 'margin-top:24px' }, 'Reset di un singolo PIN'),
+    h('p', {}, 'Crea i PIN e mandali uno per uno in privato, direttamente da qui. I PIN non sono recuperabili: si possono solo rifare.'),
+    h('div', { class: 'azioni' }, [gen, genTutti]), esito,
+    h('h3', { style: 'margin-top:24px' }, 'PIN dimenticato'),
     h('label', {}, 'Animatore'), sel, h('div', { style: 'margin-top:10px' }, reset), esitoReset
   );
 }

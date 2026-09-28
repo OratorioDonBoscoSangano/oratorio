@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0047AB">
+<title>Guida all'app · Oratorio Don Bosco</title>
+<link rel="icon" href="icona-192.png">
+<style>
+  :root {
+    --blu: #1553E6; --blu-scuro: #0B3A9E; --blu-tenue: #E8EFFE; --testata: #0047AB;
+    --viola: #6B3FBF; --viola-tenue: #EFE9FC; --ambra-tenue: #FFF3DA; --verde-tenue: #E3F5EA; --verde: #19703F;
+    --testo: #141A2B; --muto: #5F6779; --linea: #E3E7EF; --fondo: #F4F6FA; --superficie: #fff;
+    --raggio: 18px; --raggio-s: 14px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--fondo); color: var(--testo);
+    font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  header {
+    background: var(--testata); color: #fff; padding: 22px 16px 26px;
+    padding-top: max(22px, env(safe-area-inset-top));
+  }
+  header .riga { max-width: 640px; margin: 0 auto; display: flex; align-items: center; gap: 14px; }
+  header img { width: 52px; height: 52px; border-radius: 14px; background: #fff; }
+  header h1 { margin: 0; font-size: 1.35rem; line-height: 1.2; }
+  header p { margin: 2px 0 0; opacity: .85; font-size: .92rem; }
+  main { max-width: 640px; margin: 0 auto; padding: 8px 16px 48px; }
+
+  nav.indice { display: flex; gap: 7px; overflow-x: auto; padding: 16px 0 6px; scrollbar-width: none; }
+  nav.indice::-webkit-scrollbar { display: none; }
+  nav.indice a {
+    flex: none; padding: 7px 14px; border-radius: 999px; background: var(--superficie);
+    border: 1.5px solid var(--linea); color: var(--muto); font-weight: 650; font-size: .88rem; text-decoration: none;
+  }
+
+  h2 { font-size: 1.2rem; margin: 30px 0 10px; scroll-margin-top: 14px; display: flex; align-items: center; gap: 10px; }
+  h2 .ico { width: 34px; height: 34px; border-radius: 10px; background: var(--blu-tenue); color: var(--blu-scuro);
+    display: inline-flex; align-items: center; justify-content: center; flex: none; }
+  h2 .ico svg { width: 19px; height: 19px; }
+  p { margin: 8px 0; }
+  .scheda {
+    background: var(--superficie); border: 1px solid var(--linea); border-radius: var(--raggio);
+    padding: 16px 18px; margin: 10px 0; box-shadow: 0 1px 2px rgba(20,26,43,.04);
+  }
+  .scheda h3 { margin: 0 0 6px; font-size: 1rem; }
+  .passi { list-style: none; counter-reset: p; margin: 0; padding: 0; }
+  .passi li { counter-increment: p; position: relative; padding: 0 0 12px 40px; }
+  .passi li:last-child { padding-bottom: 0; }
+  .passi li::before {
+    content: counter(p); position: absolute; left: 0; top: 0; width: 28px; height: 28px; border-radius: 50%;
+    background: var(--blu); color: #fff; font-weight: 700; font-size: .88rem;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .due { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  @media (max-width: 520px) { .due { grid-template-columns: 1fr; } }
+  .tasto {
+    display: inline-block; padding: 1px 9px; border-radius: 8px; background: var(--blu-tenue);
+    color: var(--blu-scuro); font-weight: 650; font-size: .9em; white-space: nowrap;
+  }
+  .nota { background: var(--ambra-tenue); border-radius: var(--raggio-s); padding: 12px 14px; margin: 10px 0; font-size: .94rem; }
+  .ok { background: var(--verde-tenue); border-radius: var(--raggio-s); padding: 12px 14px; margin: 10px 0; font-size: .94rem; }
+  .ruolo { display: inline-block; font-size: .72rem; font-weight: 700; padding: 2px 9px; border-radius: 999px;
+    background: var(--viola-tenue); color: var(--viola); vertical-align: middle; margin-left: 4px; }
+  ul.semplice { margin: 6px 0; padding-left: 20px; }
+  ul.semplice li { margin: 4px 0; }
+  .apri {
+    display: block; text-align: center; margin: 22px 0 6px; padding: 14px; border-radius: 999px;
+    background: var(--blu); color: #fff; font-weight: 700; text-decoration: none; font-size: 1.05rem;
+  }
+  details { background: var(--superficie); border: 1px solid var(--linea); border-radius: var(--raggio-s); margin: 8px 0; }
+  details summary { cursor: pointer; padding: 13px 16px; font-weight: 650; list-style: none; }
+  details summary::-webkit-details-marker { display: none; }
+  details summary::after { content: '+'; float: right; color: var(--muto); font-weight: 700; }
+  details[open] summary::after { content: '–'; }
+  details > div { padding: 0 16px 14px; }
+  footer { text-align: center; color: var(--muto); font-size: .82rem; margin-top: 34px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="riga">
+    <img src="icona-192.png" alt="">
+    <div>
+      <h1>Come funziona l'app dell'oratorio</h1>
+      <p>Oratorio Don Bosco · Sangano</p>
+    </div>
+  </div>
+</header>
+
+<main>
+  <nav class="indice" aria-label="Indice">
+    <a href="#accesso">Primo accesso</a>
+    <a href="#installa">Installala</a>
+    <a href="#notifiche">Notifiche</a>
+    <a href="#schermate">Le schermate</a>
+    <a href="#volantini">Volantini</a>
+    <a href="#responsabili">Responsabili</a>
+    <a href="#problemi">Problemi?</a>
+  </nav>
+
+  <p>Nell'app trovi il programma di ogni sabato, cosa tocca a te, il calendario dell'anno con gli eventi della parrocchia e tutti i giochi. Si usa dal telefono, come una normale app, e non serve un account Google.</p>
+
+  <h2 id="accesso"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg></span>Primo accesso</h2>
+  <div class="scheda">
+    <p style="margin-top:0">In privato ti arriva un messaggio con tre cose: il <b>link</b>, il <b>codice dell'oratorio</b> e il tuo <b>PIN</b> di 6 cifre.</p>
+    <ol class="passi">
+      <li>Apri il link dal telefono.</li>
+      <li>Scrivi il codice dell'oratorio. Lo chiede solo la prima volta.</li>
+      <li>Scegli il tuo nome dall'elenco.</li>
+      <li>Metti il PIN e premi <span class="tasto">Entra</span>. Resti dentro per due mesi, senza doverlo rimettere.</li>
+    </ol>
+  </div>
+  <div class="nota"><b>Il PIN è solo tuo.</b> Non girarlo a nessuno e non scriverlo nei gruppi: chi lo ha può entrare a nome tuo. Dopo 5 tentativi sbagliati l'accesso si blocca per 15 minuti.</div>
+
+  <h2 id="installa"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10.5 18.5h3"/></svg></span>Mettila sulla schermata Home</h2>
+  <p>Così la apri con un tocco, come le altre app. Su iPhone è anche l'unico modo per ricevere le notifiche.</p>
+  <div class="due">
+    <div class="scheda">
+      <h3>iPhone</h3>
+      <ol class="passi">
+        <li>Apri il link con <b>Safari</b>.</li>
+        <li>Tocca <span class="tasto">Condividi</span>, il quadrato con la freccia verso l'alto.</li>
+        <li>Scegli <span class="tasto">Aggiungi alla schermata Home</span>.</li>
+      </ol>
+    </div>
+    <div class="scheda">
+      <h3>Android</h3>
+      <ol class="passi">
+        <li>Apri il link con <b>Chrome</b>.</li>
+        <li>Tocca i tre puntini <span class="tasto">⋮</span> in alto a destra.</li>
+        <li>Scegli <span class="tasto">Installa app</span> oppure <span class="tasto">Aggiungi a schermata Home</span>.</li>
+      </ol>
+    </div>
+  </div>
+
+  <h2 id="notifiche"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0"/></svg></span>Attiva le notifiche</h2>
+  <div class="scheda">
+    <ol class="passi">
+      <li>Apri la schermata <span class="tasto">Io</span>.</li>
+      <li>In fondo, alla voce Notifiche, tocca <span class="tasto">Attiva le notifiche</span>.</li>
+      <li>Quando il telefono lo chiede, premi <span class="tasto">Consenti</span>.</li>
+    </ol>
+  </div>
+  <p>Ti arrivano:</p>
+  <ul class="semplice">
+    <li>il <b>promemoria</b> prima dei sabati in cui hai un incarico, con quello che ti tocca;</li>
+    <li>gli <b>eventi della parrocchia</b> più importanti;</li>
+    <li>gli <b>avvisi</b> urgenti, per esempio se cambia qualcosa all'ultimo;</li>
+    <li>i messaggi sui <b>volantini</b>, se te ne è stato affidato uno.</li>
+  </ul>
+  <div class="ok">Sostituiscono i messaggi di promemoria su WhatsApp: attivale, altrimenti rischi di non sapere cosa ti tocca.</div>
+
+  <h2 id="schermate"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></svg></span>Le schermate</h2>
+  <div class="scheda">
+    <h3>Sabato</h3>
+    <p style="margin:0">Si apre sul prossimo sabato: orari, giochi, preghiera e chi fa cosa. Le voci in cui ci sei tu sono evidenziate. In alto rispondi <span class="tasto">Ci sono</span> o <span class="tasto">Non ci sono</span>: <b>rispondi ogni settimana</b>, così i Responsabili sanno su chi contare. Le attività prima della Messa sono nella tendina <i>Attività e gioco libero</i>.</p>
+  </div>
+  <div class="scheda">
+    <h3>Io</h3>
+    <p style="margin:0">I tuoi prossimi incarichi, le tue squadre, le disponibilità per l'estate, i volantini che ti sono stati affidati e le notifiche.</p>
+  </div>
+  <div class="scheda">
+    <h3>Anno</h3>
+    <p style="margin:0">Tutti i sabati dell'anno, mese per mese, insieme agli eventi della parrocchia (in viola). Tocca un sabato per vederne il programma, oppure un evento per orario, luogo e note. In alto puoi filtrare: <i>Solo oratorio</i> o <i>Solo parrocchia</i>.</p>
+  </div>
+  <div class="scheda">
+    <h3>Giochi</h3>
+    <p style="margin:0">Il catalogo di tutti i giochi con spiegazione, materiale e varianti; lo cerchi per nome o materiale e lo filtri per tipo, classificazione, durata e luogo. Con <span class="tasto">+ Nuovo</span> ne aggiungi uno che conosci. Se trovi un errore in una scheda, aprila e usa <span class="tasto">Correggi questa scheda</span>.</p>
+  </div>
+  <p><b>Animatori:</b> se sei responsabile di un gioco o di un'attività, nella schermata Sabato trovi <span class="tasto">Modifica</span> per scegliere il gioco o aggiungere note.</p>
+
+  <h2 id="volantini"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5h9l4 4v13H6z"/><path d="M15 3.5v4h4M9 12h7M9 15.5h7"/></svg></span>Volantini</h2>
+  <div class="scheda">
+    <h3>Mandarlo sui gruppi</h3>
+    <p style="margin:0">Quando c'è un volantino pronto, lo trovi nella schermata del sabato, o nell'evento se riguarda la parrocchia. Tocca <span class="tasto">Condividi</span>, scegli WhatsApp e il gruppo: l'immagine è già allegata.</p>
+  </div>
+  <div class="scheda">
+    <h3>Se tocca a te prepararlo</h3>
+    <ol class="passi">
+      <li>Ti arriva una notifica; il volantino compare in <span class="tasto">Io</span> → <i>I miei volantini</i>, con la scadenza.</li>
+      <li>Fallo come preferisci (Canva va benissimo) e salvalo come immagine o PDF.</li>
+      <li>Caricalo da lì. Se ci sono bambini riconoscibili nelle foto, spunta la casella.</li>
+      <li>Un Responsabile lo approva, oppure ti scrive cosa correggere. Quando è approvato, lo possono condividere tutti.</li>
+    </ol>
+  </div>
+
+  <h2 id="responsabili"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l.9-3.6L15.3 6a1.8 1.8 0 0 1 2.6 0l.6.6a1.8 1.8 0 0 1 0 2.6L8.1 19.6zM13.8 7.6l2.6 2.6"/></svg></span>Per i Responsabili <span class="ruolo">Responsabili</span></h2>
+  <p>Avete in più la schermata <span class="tasto">Gestione</span>:</p>
+  <ul class="semplice">
+    <li><b>Programma</b>: giochi, persone, postazioni e tipo di gioco di ogni sabato. Se un responsabile ha detto che non c'è, la voce si segna in rosso.</li>
+    <li><b>Promemoria</b>: manda subito le notifiche per un sabato, con i messaggi WhatsApp di riserva per chi non le ha attive.</li>
+    <li><b>Volantini</b>: create le richieste, approvate o rimandate indietro. Il nome di chi approva resta registrato.</li>
+    <li><b>Eventi</b>: il calendario della parrocchia; con <i>Avvisa tutti</i> parte la notifica.</li>
+    <li><b>Estate</b>, <b>Contatti</b> e <b>Cruscotto</b>: disponibilità estive, numeri di telefono e riepilogo dell'anno.</li>
+  </ul>
+
+  <h2 id="problemi"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.4v.5M12 16.8v.2"/></svg></span>Se qualcosa non va</h2>
+  <details>
+    <summary>Ho dimenticato il PIN</summary>
+    <div>Scrivi in privato a Saul: te ne manda uno nuovo, e quello vecchio smette di funzionare.</div>
+  </details>
+  <details>
+    <summary>Dice che l'accesso è bloccato</summary>
+    <div>Hai sbagliato il PIN troppe volte. Aspetta 15 minuti e riprova con calma.</div>
+  </details>
+  <details>
+    <summary>Non vedo le ultime novità</summary>
+    <div>Chiudi del tutto l'app e riaprila, anche due volte: si aggiorna da sola. La versione è scritta in fondo alla schermata Io.</div>
+  </details>
+  <details>
+    <summary>Le notifiche non arrivano</summary>
+    <div>Controlla in <i>Io</i> che risultino attive su questo telefono. Su iPhone l'app deve essere aggiunta alla schermata Home e va aperta da lì. Controlla anche che il telefono non abbia bloccato le notifiche nelle impostazioni.</div>
+  </details>
+  <details>
+    <summary>Un orario o un nome è sbagliato</summary>
+    <div>Avvisa un Responsabile, che può correggerlo subito dall'app.</div>
+  </details>
+
+  <a class="apri" href="./">Apri l'app</a>
+  <footer>Oratorio Don Bosco · Sangano</footer>
+</main>
+</body>
+</html>
