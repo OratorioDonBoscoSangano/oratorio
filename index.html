@@ -186,6 +186,40 @@
   .etichetta.rossa { background: var(--rosso-tenue); color: var(--rosso); }
   .etichetta.verde { background: #E3F5EA; color: #19703F; }
 
+  /* incarichi */
+  .segmento-piccolo { display: flex; background: var(--superficie); border: 1.5px solid var(--linea); border-radius: 999px; padding: 3px; margin: 0 0 14px; }
+  .segmento-piccolo button { flex: 1; min-height: 36px; border: 0; border-radius: 999px; background: none; font: inherit; font-size: .86rem; font-weight: 650; color: var(--muto); cursor: pointer; }
+  .segmento-piccolo button.on { background: var(--blu); color: #fff; }
+  .ria-testa { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-weight: 750; font-size: 1.02rem; margin-bottom: 4px; }
+  .conta-piccola { margin-left: auto; font-size: .78rem; color: var(--muto); font-weight: 600; }
+  .ria-riga { padding: 10px 0; border-top: 1px solid var(--linea); }
+  .ria-riga:first-of-type { border-top: 0; }
+  .ria-riga.squadra .ria-titolo { color: var(--blu-scuro); }
+  .ria-cosa { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+  .ria-titolo { font-weight: 650; font-size: .92rem; }
+  .ria-quando { color: var(--muto); font-size: .82rem; white-space: nowrap; }
+  .ria-riga select { font-size: .9rem; min-height: 42px; }
+  .barra-conferma { position: sticky; bottom: calc(76px + env(safe-area-inset-bottom)); padding: 10px 0 4px; background: linear-gradient(transparent, var(--fondo) 30%); }
+  .ok-box { background: #E3F5EA; color: #19703F; border-radius: var(--raggio-s); padding: 14px 16px; font-weight: 600; }
+  .inc-sabato.passato { opacity: .75; }
+  .inc-voce { padding: 8px 0; border-top: 1px solid var(--linea); }
+  .inc-att { font-weight: 650; font-size: .9rem; display: flex; gap: 7px; align-items: center; flex-wrap: wrap; }
+  .inc-persone { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .chip-persona { border: 1.5px solid var(--linea); background: var(--superficie); border-radius: 999px; padding: 5px 11px; font: inherit; font-size: .86rem; color: var(--testo); cursor: pointer; }
+  .chip-persona:disabled { cursor: default; color: var(--testo); }
+  .chip-persona.problema { border-color: #F0B9BB; background: var(--rosso-tenue); }
+  .chip-persona small { color: var(--muto); }
+  .chip-persona .motivo { color: var(--rosso); font-weight: 650; }
+  .sostituisci { flex-basis: 100%; background: var(--fondo); border-radius: var(--raggio-xs); padding: 10px 12px; }
+  .inc-anim { border-bottom: 1px solid var(--linea); }
+  .inc-anim-testa { width: 100%; display: grid; grid-template-columns: 1fr 70px 28px; gap: 4px 10px; align-items: center; padding: 11px 2px; background: none; border: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+  .inc-anim-nome { font-weight: 650; display: flex; gap: 7px; align-items: center; flex-wrap: wrap; }
+  .inc-barra { height: 6px; background: var(--fondo); border-radius: 3px; overflow: hidden; }
+  .inc-barra i { display: block; height: 100%; background: var(--blu); border-radius: 3px; }
+  .inc-anim-num { font-weight: 750; text-align: right; font-variant-numeric: tabular-nums; }
+  .inc-anim-sotto { grid-column: 1 / -1; color: var(--muto); font-size: .8rem; }
+  .inc-storico { padding: 0 2px 12px; font-size: .86rem; display: grid; gap: 2px; }
+
   /* PIN da mandare in privato */
   .pin-testa { display: flex; justify-content: space-between; align-items: center; font-weight: 700; margin: 16px 0 6px; }
   .pin-testa .conta { font-size: .82rem; color: var(--muto); font-weight: 650; }
@@ -464,7 +498,7 @@
    ===================================================================== */
 // Cambia a ogni modifica dell'interfaccia: compare in fondo alla scheda "Io",
 // così si capisce subito se il telefono sta eseguendo la versione aggiornata.
-const VERSIONE_APP = '2026.09.29';
+const VERSIONE_APP = '2026.09.30b';
 
 /* =====================================================================
    CONFIGURAZIONE
@@ -844,7 +878,7 @@ function vistaSabato(d) {
     box.appendChild(h('div', { class: 'chiuso' }, 'L\'oratorio è chiuso' + (cal.nota ? ': ' + cal.nota : '.')));
   } else {
     // presenza (solo per date non passate)
-    if (cal.idData >= oggiId()) box.appendChild(blocchettoPresenza(cal.idData, d.presenzaMia));
+    if (cal.idData >= oggiId() && (S.utente || {}).disponibilita !== 'nessuno') box.appendChild(blocchettoPresenza(cal.idData, d.presenzaMia));
 
     // le attività dell'ora prima della Messa stanno insieme al gioco libero,
     // in una tendina: sono sei ogni sabato e affogherebbero il resto
@@ -1053,7 +1087,7 @@ async function schermataIo() {
 
   if (d.prossimo) {
     box.appendChild(h('p', { class: 'piccolo muto', style: 'margin-top:14px' }, 'Prossimo sabato: ' + d.prossimo.testo));
-    box.appendChild(blocchettoPresenza(d.prossimo.idData, d.presenzaProssimo));
+    if (d.utente.disponibilita !== 'nessuno') box.appendChild(blocchettoPresenza(d.prossimo.idData, d.presenzaProssimo));
   }
 
   box.appendChild(h('h2', {}, 'I miei incarichi'));
@@ -1836,10 +1870,185 @@ async function gestioneVolantini(cont) {
   cont.replaceChildren(area);
 }
 
+/* =====================================================================
+   INCARICHI — chi fa cosa, e riassegnazioni guidate
+   ===================================================================== */
+
+/** Menu a tendina dei candidati: il primo è la proposta, poi gli altri in ordine. */
+function selectCandidati(candidati, proposta, conTogli) {
+  const opz = candidati.map((c, i) => ({ v: c.id, t: c.nomeVis + ' — ' + c.nota + (i === 0 ? ' ★' : '') }));
+  if (conTogli) opz.push({ v: '', t: '— nessuno: togli soltanto —' });
+  return select(opz, proposta || (candidati[0] || {}).id || '');
+}
+
+async function gestioneIncarichi(cont, vista) {
+  const d = await api('incarichi');
+  vista = vista || S.vistaIncarichi || (d.problemi.length ? 'sistemare' : 'sabati');
+  S.vistaIncarichi = vista;
+  const ricarica = v => gestioneIncarichi(cont, v);
+
+  const schede = h('div', { class: 'segmento-piccolo' }, [
+    ['sistemare', 'Da sistemare' + (d.problemi.length ? ' (' + d.problemi.length + ')' : '')],
+    ['sabati', 'Sabati'], ['animatori', 'Animatori']
+  ].map(t => h('button', { class: t[0] === vista ? 'on' : '', onclick: () => ricarica(t[0]) }, t[1])));
+  const area = h('div');
+  cont.replaceChildren(schede, area);
+
+  if (vista === 'sistemare') vistaDaSistemare(area, d, ricarica);
+  else if (vista === 'sabati') vistaSabatiIncarichi(area, d, ricarica);
+  else vistaAnimatoriIncarichi(area, d);
+}
+
+/** Tutti gli incarichi futuri da riassegnare, con la proposta già scelta. */
+function vistaDaSistemare(area, d, ricarica) {
+  if (!d.problemi.length) {
+    area.replaceChildren(h('div', { class: 'ok-box' }, 'Tutto a posto: nessun incarico futuro è affidato a chi non può farlo.'));
+    return;
+  }
+  const scelte = [];
+  const gruppi = {};
+  d.problemi.forEach(p => { (gruppi[p.daNome + '|' + p.motivo] = gruppi[p.daNome + '|' + p.motivo] || []).push(p); });
+
+  const blocchi = Object.keys(gruppi).map(k => {
+    const lista = gruppi[k];
+    const [nome, motivo] = k.split('|');
+    const righe = lista.map(p => {
+      const sel = selectCandidati(p.candidati, p.proposta, true);
+      scelte.push({ p, sel });
+      return h('div', { class: 'ria-riga' + (p.tipo === 'squadra' ? ' squadra' : '') }, [
+        h('div', { class: 'ria-cosa' }, [
+          h('div', { class: 'ria-titolo' }, p.titolo),
+          h('div', { class: 'ria-quando' }, p.quando)
+        ]),
+        sel
+      ]);
+    });
+    return h('div', { class: 'modulo' }, [
+      h('div', { class: 'ria-testa' }, [nome, h('span', { class: 'etichetta ambra' }, motivo), h('span', { class: 'conta-piccola' }, lista.length + (lista.length === 1 ? ' incarico' : ' incarichi'))]),
+      ...righe
+    ]);
+  });
+
+  const esito = h('div');
+  const conferma = h('button', { class: 'b largo', onclick: async () => {
+    const modifiche = scelte.map(({ p, sel }) => ({ tipo: p.tipo, chiave: p.chiave, n: p.n, da: p.da, a: sel.value }));
+    const togli = modifiche.filter(m => !m.a).length;
+    if (!confirm('Applico ' + modifiche.length + ' modifiche' + (togli ? ' (' + togli + ' senza sostituto)' : '') + '?')) return;
+    conferma.disabled = true;
+    try {
+      const r = await api('applicaRiassegnazioni', { modifiche });
+      S.animatori = null;
+      toast(r.fatte + ' incarichi riassegnati');
+      if (r.saltate.length) alert('Fatto. Alcune erano già cambiate:\n\n' + r.saltate.join('\n'));
+      ricarica('sistemare');
+    } catch (e) { esito.replaceChildren(errore(e)); conferma.disabled = false; }
+  } }, 'Conferma tutte (' + d.problemi.length + ')');
+
+  area.replaceChildren(
+    h('p', { class: 'muto piccolo', style: 'margin-top:0' },
+      'Per ogni incarico ho già scelto il sostituto migliore (★): poco carico, libero quel sabato, del grado giusto. Cambia quelli che non ti convincono, poi conferma. Chi sostituisce qualcuno in una squadra viene proposto anche per i sabati di quella squadra.'),
+    ...blocchi,
+    h('div', { class: 'barra-conferma' }, [conferma, esito])
+  );
+}
+
+/** Ogni sabato con voci e persone; sui futuri si può sostituire con un tocco. */
+function vistaSabatiIncarichi(area, d, ricarica) {
+  let passati = !!S.incarichiPassati, soloBuchi = !!S.incarichiBuchi;
+  const elenco = h('div');
+  const filtri = h('div', { class: 'azioni', style: 'margin-top:0' }, [
+    h('label', { style: 'margin:0' }, [(() => { const c = h('input', { type: 'checkbox' }); c.checked = passati; c.onchange = () => { passati = S.incarichiPassati = c.checked; disegna(); }; return c; })(), 'Mostra i passati']),
+    h('label', { style: 'margin:0' }, [(() => { const c = h('input', { type: 'checkbox' }); c.checked = soloBuchi; c.onchange = () => { soloBuchi = S.incarichiBuchi = c.checked; disegna(); }; return c; })(), 'Solo quelli da sistemare'])
+  ]);
+
+  function persona(v, p, s) {
+    const chip = h('button', { class: 'chip-persona' + (p.problema ? ' problema' : '') }, [
+      p.nomeVis, p.ruolo === 'Responsabile' ? h('small', {}, ' resp.') : null,
+      p.problema ? h('small', { class: 'motivo' }, ' · ' + p.problema) : null
+    ]);
+    chip.disabled = !s.futuro;   // i sabati passati sono solo storico
+    if (s.futuro) chip.onclick = async () => {
+      const box = h('div', { class: 'sostituisci' }, h('span', { class: 'muto piccolo' }, 'Cerco i sostituti…'));
+      chip.after(box); chip.disabled = true;
+      try {
+        const cand = await api('candidati', { idProg: v.idProg, da: p.idAnimatore });
+        const sel = selectCandidati(cand, '', false);
+        box.replaceChildren(
+          h('label', { style: 'margin-top:0' }, 'Al posto di ' + p.nomeVis), sel,
+          h('div', { class: 'azioni' }, [
+            h('button', { class: 'b piccolo', onclick: async () => {
+              try { await api('applicaRiassegnazioni', { modifiche: [{ tipo: 'assegnazione', chiave: v.idProg, da: p.idAnimatore, a: sel.value }] });
+                toast('Sostituito'); ricarica('sabati'); } catch (e) { toast(String(e), true); }
+            } }, 'Sostituisci'),
+            h('button', { class: 'b pericolo piccolo', onclick: async () => {
+              if (!confirm('Togliere ' + p.nomeVis + ' senza sostituirlo?')) return;
+              try { await api('applicaRiassegnazioni', { modifiche: [{ tipo: 'assegnazione', chiave: v.idProg, da: p.idAnimatore, a: '' }] });
+                toast('Tolto'); ricarica('sabati'); } catch (e) { toast(String(e), true); }
+            } }, 'Togli'),
+            h('button', { class: 'b secondario piccolo', onclick: () => { box.remove(); chip.disabled = false; } }, 'Annulla')
+          ]));
+      } catch (e) { box.replaceChildren(errore(e)); }
+    };
+    return chip;
+  }
+
+  function disegna() {
+    const sabati = d.sabati.filter(s => passati || s.futuro)
+      .filter(s => !soloBuchi || s.voci.some(v => v.senzaResponsabile || v.persone.some(p => p.problema)));
+    if (!sabati.length) { elenco.replaceChildren(vuoto(soloBuchi ? 'Niente da sistemare.' : 'Nessun sabato.')); return; }
+    elenco.replaceChildren(...sabati.map(s => h('div', { class: 'modulo inc-sabato' + (s.futuro ? '' : ' passato') }, [
+      h('div', { class: 'ria-testa' }, ['Sabato ' + s.breve, s.evento ? h('span', { class: 'etichetta viola' }, s.evento) : null]),
+      ...s.voci.filter(v => !soloBuchi || v.senzaResponsabile || v.persone.some(p => p.problema)).map(v => h('div', { class: 'inc-voce' }, [
+        h('div', { class: 'inc-att' }, [v.attivita, v.senzaResponsabile && s.futuro ? h('span', { class: 'etichetta rossa' }, 'senza responsabile') : null]),
+        h('div', { class: 'inc-persone' }, v.persone.length ? v.persone.map(p => persona(v, p, s)) : h('span', { class: 'muto piccolo' }, 'nessuno'))
+      ]))
+    ])));
+  }
+  area.replaceChildren(h('p', { class: 'muto piccolo', style: 'margin-top:0' }, 'Tocca un nome per sostituirlo: il primo della lista è il più adatto. Per aggiungere persone usa la scheda Programma.'), filtri, elenco);
+  disegna();
+}
+
+/** Riepilogo per animatore: quanti incarichi, di che tipo, l'ultimo e il prossimo. */
+function vistaAnimatoriIncarichi(area, d) {
+  let ordine = S.ordineIncarichi || 'nome';
+  const elenco = h('div');
+  const CAT = [['Gioco', 'gioco', 'giochi'], ['Attività', 'attività', 'attività'], ['Preghiera', 'preghiera', 'preghiere'], ['Serata', 'serata', 'serate']];
+  function disegna() {
+    S.ordineIncarichi = ordine;
+    const lista = d.animatori.slice().sort(ordine === 'meno'
+      ? (a, b) => a.totale - b.totale || a.nomeVis.localeCompare(b.nomeVis, 'it')
+      : ordine === 'piu' ? (a, b) => b.totale - a.totale || a.nomeVis.localeCompare(b.nomeVis, 'it')
+      : (a, b) => a.nomeVis.localeCompare(b.nomeVis, 'it'));
+    const max = Math.max(1, ...lista.map(a => a.totale));
+    elenco.replaceChildren(...lista.map(a => {
+      const dett = h('div', { class: 'inc-storico nascosto' }, a.storico.length
+        ? a.storico.map(s => h('div', { class: s.idData < d.oggi ? 'muto' : '' }, s.breve + ' · ' + s.attivita + (s.ruolo === 'Responsabile' ? ' (resp.)' : '')))
+        : h('span', { class: 'muto' }, 'Nessun incarico.'));
+      const parti = CAT.map(c => { const n = a.perCategoria[c[0]]; return n ? n + ' ' + (n === 1 ? c[1] : c[2]) : null; }).filter(Boolean);
+      return h('div', { class: 'inc-anim' }, [
+        h('button', { class: 'inc-anim-testa', onclick: () => dett.classList.toggle('nascosto') }, [
+          h('div', { class: 'inc-anim-nome' }, [a.nomeVis,
+            a.nessunIncarico ? h('span', { class: 'etichetta ambra' }, 'nessun incarico')
+              : a.soloSerate ? h('span', { class: 'etichetta viola' }, 'solo serate') : h('span', { class: 'etichetta' }, a.grado.toLowerCase())]),
+          h('div', { class: 'inc-barra' }, h('i', { style: 'width:' + (a.totale ? Math.max(8, Math.round(a.totale / max * 100)) : 0) + '%' })),
+          h('div', { class: 'inc-anim-num' }, String(a.totale)),
+          h('div', { class: 'inc-anim-sotto' }, (parti.join(' · ') || 'nessun incarico') +
+            (a.ultimoBreve ? ' · ultimo ' + a.ultimoBreve : '') + (a.prossimoBreve ? ' · prossimo ' + a.prossimoBreve : ''))
+        ]),
+        dett
+      ]);
+    }));
+  }
+  const sel = select([{ v: 'nome', t: 'In ordine di nome' }, { v: 'meno', t: 'Prima chi ne ha meno' }, { v: 'piu', t: 'Prima chi ne ha di più' }], ordine);
+  sel.onchange = () => { ordine = sel.value; disegna(); };
+  area.replaceChildren(h('p', { class: 'muto piccolo', style: 'margin-top:0' }, 'Incarichi di tutto l\'anno, passati e futuri. Tocca un nome per vedere quando e cosa.'), sel, elenco);
+  disegna();
+}
+
 async function schermataGestione(scheda, apri) {
   scheda = scheda || 'programma';
   const tab = h('div', { class: 'schede' }, [
-    ['programma', 'Programma'], ['promemoria', 'Promemoria'], ['volantini', 'Volantini'], ['eventi', 'Eventi'],
+    ['programma', 'Programma'], ['incarichi', 'Incarichi'], ['promemoria', 'Promemoria'], ['volantini', 'Volantini'], ['eventi', 'Eventi'],
     ['estate', 'Estate'], ['contatti', 'Contatti'], ['cruscotto', 'Cruscotto']
   ].map(t => h('button', { class: t[0] === scheda ? 'on' : '', onclick: () => schermataGestione(t[0]) }, t[1])));
   const contenuto = h('div', {}, h('p', { class: 'muto' }, 'Carico…'));
@@ -1849,6 +2058,7 @@ async function schermataGestione(scheda, apri) {
     else if (scheda === 'promemoria') await gestionePromemoria(contenuto);
     else if (scheda === 'eventi') await gestioneEventi(contenuto, apri);
     else if (scheda === 'volantini') await gestioneVolantini(contenuto);
+    else if (scheda === 'incarichi') await gestioneIncarichi(contenuto);
     else if (scheda === 'estate') await gestioneEstate(contenuto);
     else if (scheda === 'contatti') await gestioneContatti(contenuto);
     else await gestioneCruscotto(contenuto);
@@ -2207,7 +2417,9 @@ function blocchettoGestioneVoce(v, g) {
         } }, 'Togli')
       ]);
     });
-    const nuovo = select([{ v: '', t: 'Aggiungi animatore…' }].concat(g.animatori.map(a => ({ v: a.id, t: a.nomeVis }))), '');
+    // chi fa solo le serate compare solo nelle serate
+    const ammessi = g.animatori.filter(a => !a.nessunIncarico && (!a.soloSerate || v.categoria === 'Serata'));
+    const nuovo = select([{ v: '', t: 'Aggiungi animatore…' }].concat(ammessi.map(a => ({ v: a.id, t: a.nomeVis }))), '');
     const ruoloNuovo = select(g.ruoli, g.ruoli[0]);
     const btn = h('button', { class: 'b piccolo', onclick: async () => {
       if (!nuovo.value) return;
@@ -2236,7 +2448,7 @@ function editorPostazioni(v, g) {
   const cont = h('div', { style: 'margin-top:12px' });
   const etichetta = v.categoria === 'Serata' ? 'Postazioni e personaggi della serata'
     : v.idAtt === 'GioSta' ? 'Gli stand' : 'Altri giochi del pomeriggio';
-  const animOpz = [{ v: '', t: '— nessuno —' }].concat(g.animatori.map(a => ({ v: a.id, t: a.nomeVis })));
+  const animOpz = [{ v: '', t: '— nessuno —' }].concat(g.animatori.filter(a => !a.nessunIncarico && (!a.soloSerate || v.categoria === 'Serata')).map(a => ({ v: a.id, t: a.nomeVis })));
 
   async function modulo(p, dove) {
     const cg = await campoGioco(p.idGioco, false);
@@ -2593,6 +2805,8 @@ async function adminAnagrafica(cont) {
   const lista = h('div', { class: 'lista' });
   d.animatori.forEach(a => lista.appendChild(h('div', { class: 'riga cliccabile', style: a.attivo ? '' : 'opacity:.5', onclick: () => modulo(a) }, [
     h('span', { class: 'titolo' }, a.nomeVis), h('span', { class: 'etichetta' }, a.grado), a.attivo ? null : h('span', { class: 'etichetta rossa' }, 'non attivo'),
+    a.attivo && a.soloSerate ? h('span', { class: 'etichetta viola' }, 'solo serate') : null,
+    a.attivo && a.nessunIncarico ? h('span', { class: 'etichetta ambra' }, 'nessun incarico') : null,
     h('div', { class: 'sotto' }, a.nome + ' ' + a.cognome + (a.anno ? ' · ' + a.anno : ''))
   ])));
   cont.replaceChildren(h('div', { class: 'azioni', style: 'margin:0 0 12px' }, h('button', { class: 'b secondario', onclick: () => modulo({ id: '', nome: '', cognome: '', nomeVis: '', anno: '', grado: d.gradi[0], attivo: true, contatto: '' }) }, 'Nuovo animatore')), area, lista);
@@ -2604,9 +2818,15 @@ async function adminAnagrafica(cont) {
     const grado = select(d.gradi, a.grado);
     const attivo = h('input', { type: 'checkbox', style: 'width:auto;min-height:0;margin-right:8px' }); attivo.checked = !!a.attivo;
     const contatto = h('input', { type: 'text', value: a.contatto });
+    const disponibilita = select([
+      { v: 'tutto', t: 'Tutte le attività' },
+      { v: 'serate', t: 'Solo serate' },
+      { v: 'nessuno', t: 'Nessun incarico (resta nell\'app)' }
+    ], a.disponibilita || 'tutto');
     const btn = h('button', { class: 'b', onclick: async () => {
       try {
-        await api('salvaAnagrafica', { id: a.id, nome: nome.value, cognome: cognome.value, nomeVis: nomeVis.value, anno: anno.value, grado: grado.value, attivo: attivo.checked, contatto: contatto.value });
+        await api('salvaAnagrafica', { id: a.id, nome: nome.value, cognome: cognome.value, nomeVis: nomeVis.value, anno: anno.value, grado: grado.value, attivo: attivo.checked, contatto: contatto.value, disponibilita: disponibilita.value });
+        if (disponibilita.value !== 'tutto' && disponibilita.value !== (a.disponibilita || 'tutto')) toast('Ora sistema i suoi incarichi in Gestione → Incarichi');
         S.animatori = null; toast('Anagrafica salvata'); schermataAdmin('anagrafica');
       } catch (e) { toast(e, true); }
     } }, 'Salva');
@@ -2614,7 +2834,10 @@ async function adminAnagrafica(cont) {
       h('div', { class: 'titolo' }, a.id ? a.id : 'Nuovo animatore'),
       h('label', {}, 'Nome'), nome, h('label', {}, 'Cognome'), cognome, h('label', {}, 'Nome visualizzato'), nomeVis,
       h('label', {}, 'Anno di nascita'), anno, h('label', {}, 'Grado'), grado,
-      h('label', {}, [attivo, 'Attivo']), h('label', {}, 'Contatto'), contatto,
+      h('label', {}, [attivo, 'Attivo']),
+      h('label', {}, 'Disponibilità quest\'anno'), disponibilita,
+      h('p', { class: 'piccolo muto', style: 'margin:4px 0 0' }, 'Con "Solo serate" o "Nessun incarico" la persona continua a entrare nell\'app e a ricevere gli avvisi, ma non le si possono affidare altri incarichi.'),
+      h('label', {}, 'Contatto'), contatto,
       h('div', { class: 'azioni' }, [btn, h('button', { class: 'b secondario', onclick: () => area.replaceChildren() }, 'Annulla')])
     ]));
     window.scrollTo(0, 0);
@@ -2641,7 +2864,8 @@ async function adminSquadre(cont) {
         } }, 'Togli')
       ]);
     });
-    const nuovo = select([{ v: '', t: 'Aggiungi animatore…' }].concat(d.animatori.map(a => ({ v: a.id, t: a.nomeVis }))), '');
+    const catSquadra = ((d.attivita || []).find(x => x.id === sel.value) || {}).categoria;
+    const nuovo = select([{ v: '', t: 'Aggiungi animatore…' }].concat(d.animatori.filter(a => !a.nessunIncarico && (!a.soloSerate || catSquadra === 'Serata')).map(a => ({ v: a.id, t: a.nomeVis }))), '');
     const ruoloNuovo = select(d.ruoli, d.ruoli[d.ruoli.length - 1]);
     const btn = h('button', { class: 'b piccolo', onclick: async () => {
       if (!nuovo.value) return;
