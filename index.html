@@ -218,6 +218,8 @@
   .inc-barra i { display: block; height: 100%; background: var(--blu); border-radius: 3px; }
   .inc-anim-num { font-weight: 750; text-align: right; font-variant-numeric: tabular-nums; }
   .inc-anim-sotto { grid-column: 1 / -1; color: var(--muto); font-size: .8rem; }
+  .inc-anim.non-disp { opacity: .7; }
+  .inc-anim-sotto b { color: var(--testo); font-weight: 650; }
   .inc-storico { padding: 0 2px 12px; font-size: .86rem; display: grid; gap: 2px; }
 
   /* PIN da mandare in privato */
@@ -498,7 +500,7 @@
    ===================================================================== */
 // Cambia a ogni modifica dell'interfaccia: compare in fondo alla scheda "Io",
 // così si capisce subito se il telefono sta eseguendo la versione aggiornata.
-const VERSIONE_APP = '2026.09.30b';
+const VERSIONE_APP = '2026.09.30c';
 
 /* =====================================================================
    CONFIGURAZIONE
@@ -1896,7 +1898,7 @@ async function gestioneIncarichi(cont, vista) {
 
   if (vista === 'sistemare') vistaDaSistemare(area, d, ricarica);
   else if (vista === 'sabati') vistaSabatiIncarichi(area, d, ricarica);
-  else vistaAnimatoriIncarichi(area, d);
+  else vistaAnimatoriIncarichi(area, d, ricarica);
 }
 
 /** Tutti gli incarichi futuri da riassegnare, con la proposta già scelta. */
@@ -2008,41 +2010,139 @@ function vistaSabatiIncarichi(area, d, ricarica) {
   disegna();
 }
 
-/** Riepilogo per animatore: quanti incarichi, di che tipo, l'ultimo e il prossimo. */
-function vistaAnimatoriIncarichi(area, d) {
-  let ordine = S.ordineIncarichi || 'nome';
+/** Riepilogo per animatore: in programma e fatti, divisi fra disponibili e non. */
+function vistaAnimatoriIncarichi(area, d, ricarica) {
+  let ordine = S.ordineIncarichi || 'piu';
   const elenco = h('div');
   const CAT = [['Gioco', 'gioco', 'giochi'], ['Attività', 'attività', 'attività'], ['Preghiera', 'preghiera', 'preghiere'], ['Serata', 'serata', 'serate']];
+  const carico = a => a.totale - (a.perCategoria.Serata || 0);   // quello che la ridistribuzione pareggia
+  const riga = (a, max) => {
+    const daFare = a.totale - a.fatti;
+    const dett = h('div', { class: 'inc-storico nascosto' }, a.storico.length
+      ? a.storico.map(s => h('div', { class: s.idData < d.oggi ? 'muto' : '' }, (s.idData < d.oggi ? '✓ ' : '') + s.breve + ' · ' + s.attivita + (s.ruolo === 'Responsabile' ? ' (resp.)' : '')))
+      : h('span', { class: 'muto' }, 'Nessun incarico.'));
+    const parti = CAT.map(c => { const n = a.perCategoria[c[0]]; return n ? n + ' ' + (n === 1 ? c[1] : c[2]) : null; }).filter(Boolean);
+    const nonDisp = a.nessunIncarico || a.soloSerate;
+    return h('div', { class: 'inc-anim' + (nonDisp ? ' non-disp' : '') }, [
+      h('button', { class: 'inc-anim-testa', onclick: () => dett.classList.toggle('nascosto') }, [
+        h('div', { class: 'inc-anim-nome' }, [a.nomeVis,
+          a.nessunIncarico ? h('span', { class: 'etichetta ambra' }, 'nessun incarico')
+            : a.soloSerate ? h('span', { class: 'etichetta viola' }, 'solo serate') : h('span', { class: 'etichetta' }, a.grado.toLowerCase())]),
+        h('div', { class: 'inc-barra' }, h('i', { style: 'width:' + (carico(a) ? Math.max(6, Math.round(carico(a) / max * 100)) : 0) + '%' })),
+        h('div', { class: 'inc-anim-num' }, String(carico(a))),
+        h('div', { class: 'inc-anim-sotto' }, [
+          h('b', {}, daFare + ' in programma'), ' · ' + a.fatti + ' già fatti',
+          parti.length ? ' · ' + parti.join(', ') : '',
+          a.prossimoBreve ? ' · prossimo ' + a.prossimoBreve : ''
+        ])
+      ]),
+      dett
+    ]);
+  };
   function disegna() {
     S.ordineIncarichi = ordine;
-    const lista = d.animatori.slice().sort(ordine === 'meno'
-      ? (a, b) => a.totale - b.totale || a.nomeVis.localeCompare(b.nomeVis, 'it')
-      : ordine === 'piu' ? (a, b) => b.totale - a.totale || a.nomeVis.localeCompare(b.nomeVis, 'it')
-      : (a, b) => a.nomeVis.localeCompare(b.nomeVis, 'it'));
-    const max = Math.max(1, ...lista.map(a => a.totale));
-    elenco.replaceChildren(...lista.map(a => {
-      const dett = h('div', { class: 'inc-storico nascosto' }, a.storico.length
-        ? a.storico.map(s => h('div', { class: s.idData < d.oggi ? 'muto' : '' }, s.breve + ' · ' + s.attivita + (s.ruolo === 'Responsabile' ? ' (resp.)' : '')))
-        : h('span', { class: 'muto' }, 'Nessun incarico.'));
-      const parti = CAT.map(c => { const n = a.perCategoria[c[0]]; return n ? n + ' ' + (n === 1 ? c[1] : c[2]) : null; }).filter(Boolean);
-      return h('div', { class: 'inc-anim' }, [
-        h('button', { class: 'inc-anim-testa', onclick: () => dett.classList.toggle('nascosto') }, [
-          h('div', { class: 'inc-anim-nome' }, [a.nomeVis,
-            a.nessunIncarico ? h('span', { class: 'etichetta ambra' }, 'nessun incarico')
-              : a.soloSerate ? h('span', { class: 'etichetta viola' }, 'solo serate') : h('span', { class: 'etichetta' }, a.grado.toLowerCase())]),
-          h('div', { class: 'inc-barra' }, h('i', { style: 'width:' + (a.totale ? Math.max(8, Math.round(a.totale / max * 100)) : 0) + '%' })),
-          h('div', { class: 'inc-anim-num' }, String(a.totale)),
-          h('div', { class: 'inc-anim-sotto' }, (parti.join(' · ') || 'nessun incarico') +
-            (a.ultimoBreve ? ' · ultimo ' + a.ultimoBreve : '') + (a.prossimoBreve ? ' · prossimo ' + a.prossimoBreve : ''))
-        ]),
-        dett
-      ]);
-    }));
+    const cmp = ordine === 'meno' ? (a, b) => carico(a) - carico(b) || a.nomeVis.localeCompare(b.nomeVis, 'it')
+      : ordine === 'piu' ? (a, b) => carico(b) - carico(a) || a.nomeVis.localeCompare(b.nomeVis, 'it')
+      : (a, b) => a.nomeVis.localeCompare(b.nomeVis, 'it');
+    const disp = d.animatori.filter(a => !a.nessunIncarico && !a.soloSerate).sort(cmp);
+    const altri = d.animatori.filter(a => a.nessunIncarico || a.soloSerate).sort((a, b) => a.nomeVis.localeCompare(b.nomeVis, 'it'));
+    const max = Math.max(1, ...disp.map(carico));
+    const valori = disp.map(carico);
+    elenco.replaceChildren(
+      h('div', { class: 'pin-testa' }, [h('span', {}, 'Disponibili (' + disp.length + ')'),
+        h('span', { class: 'conta' }, valori.length ? 'da ' + Math.min(...valori) + ' a ' + Math.max(...valori) + ' incarichi' : '')]),
+      ...disp.map(a => riga(a, max)),
+      altri.length ? h('div', { class: 'pin-testa', style: 'margin-top:26px' }, [h('span', {}, 'Solo serate o nessun incarico (' + altri.length + ')'),
+        h('span', { class: 'conta' }, 'qui sotto c\'è il loro storico')]) : null,
+      ...altri.map(a => riga(a, max))
+    );
   }
-  const sel = select([{ v: 'nome', t: 'In ordine di nome' }, { v: 'meno', t: 'Prima chi ne ha meno' }, { v: 'piu', t: 'Prima chi ne ha di più' }], ordine);
+  const sel = select([{ v: 'piu', t: 'Prima chi ne ha di più' }, { v: 'meno', t: 'Prima chi ne ha meno' }, { v: 'nome', t: 'In ordine di nome' }], ordine);
   sel.onchange = () => { ordine = sel.value; disegna(); };
-  area.replaceChildren(h('p', { class: 'muto piccolo', style: 'margin-top:0' }, 'Incarichi di tutto l\'anno, passati e futuri. Tocca un nome per vedere quando e cosa.'), sel, elenco);
+  const pannello = h('div');
+  const apri = h('button', { class: 'b largo', onclick: () => { apri.classList.add('nascosto'); pannelloRibilancia(pannello, d, ricarica, () => apri.classList.remove('nascosto')); } }, 'Ridistribuisci in modo equilibrato');
+  area.replaceChildren(
+    h('p', { class: 'muto piccolo', style: 'margin-top:0' }, 'Il numero è il totale dell\'anno senza le serate: fatti più in programma. Tocca un nome per vedere quando e cosa.'),
+    apri, pannello, sel, elenco);
   disegna();
+}
+
+/** Opzioni, proposta e conferma della ridistribuzione. */
+function pannelloRibilancia(box, d, ricarica, chiudi) {
+  const cat = [['Gioco', 'Giochi'], ['Attività', 'Attività 1-6'], ['Preghiera', 'Preghiere']].map(c => {
+    const x = h('input', { type: 'checkbox' }); x.checked = true; return { v: c[0], x, el: h('label', { style: 'margin:4px 0' }, [x, c[1]]) };
+  });
+  const tieni = h('input', { type: 'checkbox' }); tieni.checked = true;
+  const risultato = h('div');
+  const calcola = h('button', { class: 'b', onclick: async () => {
+    const categorie = cat.filter(c => c.x.checked).map(c => c.v);
+    if (!categorie.length) { risultato.replaceChildren(errore('Scegli almeno una categoria.')); return; }
+    calcola.disabled = true;
+    risultato.replaceChildren(h('p', { class: 'muto piccolo' }, 'Calcolo…'));
+    try {
+      const r = await api('ribilanciamento', { categorie, tieniResponsabili: tieni.checked });
+      mostraProposta(r);
+    } catch (e) { risultato.replaceChildren(errore(e)); }
+    calcola.disabled = false;
+  } }, 'Calcola la proposta');
+
+  function mostraProposta(r) {
+    if (!r.mosse.length) {
+      risultato.replaceChildren(h('div', { class: 'ok-box' }, 'Già equilibrato: con queste regole non c\'è niente da spostare (oggi da ' + r.prima.min + ' a ' + r.prima.max + ').'));
+      return;
+    }
+    const scelte = [];
+    const perSabato = {};
+    r.mosse.forEach(m => { (perSabato[m.quando] = perSabato[m.quando] || []).push(m); });
+    const blocchi = Object.keys(perSabato).map(q => h('div', { class: 'modulo' }, [
+      h('div', { class: 'ria-testa' }, [q, h('span', { class: 'conta-piccola' }, perSabato[q].length + (perSabato[q].length === 1 ? ' spostamento' : ' spostamenti'))]),
+      ...perSabato[q].map(m => {
+        const sel = selectCandidati(m.candidati, m.proposta, false);
+        scelte.push({ m, sel });
+        return h('div', { class: 'ria-riga' }, [
+          h('div', { class: 'ria-cosa' }, [h('div', { class: 'ria-titolo' }, m.titolo), h('div', { class: 'ria-quando' }, 'era di ' + m.daNome)]),
+          sel
+        ]);
+      })
+    ]));
+    const esito = h('div');
+    const conferma = h('button', { class: 'b largo', onclick: async () => {
+      const modifiche = scelte.filter(({ m, sel }) => sel.value && sel.value !== m.da)
+        .map(({ m, sel }) => ({ tipo: 'assegnazione', chiave: m.chiave, da: m.da, a: sel.value }));
+      if (!modifiche.length) { toast('Nessuna modifica'); return; }
+      if (!confirm('Sposto ' + modifiche.length + ' incarichi?')) return;
+      conferma.disabled = true;
+      try {
+        const e = await api('applicaRiassegnazioni', { modifiche });
+        toast(e.fatte + ' incarichi spostati');
+        if (e.saltate.length) alert('Fatto. Alcuni erano già cambiati:\n\n' + e.saltate.join('\n'));
+        ricarica('animatori');
+      } catch (e) { esito.replaceChildren(errore(e)); conferma.disabled = false; }
+    } }, 'Conferma ' + r.mosse.length + ' spostamenti');
+    risultato.replaceChildren(
+      h('div', { class: 'ok-box', style: 'margin-top:12px' }, [
+        'Oggi: da ', h('b', {}, String(r.prima.min)), ' a ', h('b', {}, String(r.prima.max)), ' incarichi a testa. ',
+        'Dopo: da ', h('b', {}, String(r.dopo.min)), ' a ', h('b', {}, String(r.dopo.max)), '.'
+      ]),
+      r.tieniResponsabili && r.dopo.max - r.dopo.min > 3 ? h('p', { class: 'piccolo muto' },
+        'Resta una differenza perché i responsabili non si spostano: togli la spunta "Lascia i responsabili dove sono" per pareggiare di più.') : null,
+      tendina('Chi guadagna e chi perde incarichi', r.persone.filter(p => p.prima !== p.dopo).length,
+        h('div', { class: 'inc-storico', style: 'padding:8px 0 0' }, r.persone.filter(p => p.prima !== p.dopo)
+          .map(p => h('div', {}, p.nomeVis + ': ' + p.prima + ' → ' + p.dopo)))),
+      h('p', { class: 'muto piccolo' }, 'Per ogni spostamento la prima scelta è la mia; puoi cambiarla o rimettere chi c\'era ("lascia com\'era").'),
+      ...blocchi,
+      h('div', { class: 'barra-conferma' }, [conferma, esito])
+    );
+  }
+
+  box.replaceChildren(h('div', { class: 'modulo' }, [
+    h('div', { class: 'ria-testa' }, 'Ridistribuzione equilibrata'),
+    h('p', { class: 'piccolo muto', style: 'margin:0 0 6px' }, 'Sposta incarichi futuri da chi ne ha di più a chi ne ha di meno, contando tutto l\'anno. Le serate e chi non è disponibile restano fuori. Rispetta le regole della preghiera, le assenze dichiarate e non mette nessuno due volte nella stessa cosa lo stesso sabato.'),
+    h('label', {}, 'Cosa ridistribuire'), ...cat.map(c => c.el),
+    h('label', { style: 'margin-top:10px' }, [tieni, 'Lascia i responsabili dove sono']),
+    h('div', { class: 'azioni' }, [calcola, h('button', { class: 'b secondario', onclick: () => { box.replaceChildren(); chiudi(); } }, 'Chiudi')]),
+    risultato
+  ]));
 }
 
 async function schermataGestione(scheda, apri) {
