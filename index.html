@@ -571,7 +571,7 @@
    ===================================================================== */
 // Cambia a ogni modifica dell'interfaccia: compare in fondo alla scheda "Io",
 // così si capisce subito se il telefono sta eseguendo la versione aggiornata.
-const VERSIONE_APP = '2026.10.05c';
+const VERSIONE_APP = '2026.10.05d';
 
 /* =====================================================================
    CONFIGURAZIONE
@@ -990,8 +990,14 @@ function illustrazioneRiserva(nome) {
 }
 function immagineCarta(c) {
   if (!c.immagine) return illustrazioneRiserva(c.nome);
-  const img = h('img', { src: c.immagine, alt: c.nome, loading: 'lazy', referrerpolicy: 'no-referrer' });
-  img.onerror = () => img.replaceWith(illustrazioneRiserva(c.nome));
+  // le copie salvate sul telefono possono avere ancora la vecchia larghezza (600), che Wikimedia rifiuta
+  const src = /wikimedia\.org/.test(c.immagine) ? c.immagine.replace(/\/\d+px-([^\/]+)$/, '/500px-$1') : c.immagine;
+  const img = h('img', { src, alt: c.nome, loading: 'lazy', referrerpolicy: 'no-referrer' });
+  // immagine originale più stretta di 500 pixel: si riprova a 330, poi le iniziali
+  img.onerror = () => {
+    if (/\/500px-/.test(img.src)) img.src = img.src.replace('/500px-', '/330px-');
+    else img.replaceWith(illustrazioneRiserva(c.nome));
+  };
   return img;
 }
 
