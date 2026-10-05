@@ -222,6 +222,77 @@
   .inc-anim-sotto b { color: var(--testo); font-weight: 650; }
   .inc-storico { padding: 0 2px 12px; font-size: .86rem; display: grid; gap: 2px; }
 
+  /* merenda */
+  .chip-togli { margin-left: 6px; border: 0; background: none; color: var(--rosso); font-size: 1.05rem; font-weight: 700; line-height: 1; cursor: pointer; padding: 0 2px; }
+  .merenda input[type=text] { margin-top: 6px; }
+  .merenda-voce { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid var(--linea); }
+
+  /* collezione dei santi */
+  .collezione-io { display: flex; align-items: center; gap: 14px; width: 100%; margin: 14px 0 4px; padding: 14px 16px;
+    background: linear-gradient(135deg, #FFF8E1, #FDEFD0); border: 1px solid #F3DCAC; border-radius: var(--raggio-s);
+    font: inherit; color: inherit; cursor: pointer; }
+  .collezione-io .vai { width: 18px; height: 18px; color: #A77400; }
+  .mazzetto { position: relative; width: 40px; height: 46px; flex: none; }
+  .mazzetto i { position: absolute; inset: 0; border-radius: 6px; background: linear-gradient(160deg, #1553E6, #0B3A9E); border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+  .mazzetto i:nth-child(1) { transform: rotate(-12deg) translateX(-4px); }
+  .mazzetto i:nth-child(2) { transform: rotate(6deg) translateX(4px); background: linear-gradient(160deg, #F5B82E, #C98A0B); }
+  .progresso { display: flex; align-items: center; gap: 12px; margin: 6px 0; }
+  .progresso-barra { flex: 1; height: 10px; border-radius: 5px; background: var(--fondo); overflow: hidden; border: 1px solid var(--linea); }
+  .progresso-barra i { display: block; height: 100%; background: linear-gradient(90deg, #F5B82E, #E0A21C); border-radius: 5px; }
+  .griglia-carte { display: grid; grid-template-columns: repeat(auto-fill, minmax(98px, 1fr)); gap: 10px; margin-top: 12px; }
+  .carta { position: relative; background: #FFFDF6; border: 2px solid #E9C46A; border-radius: 12px; padding: 6px 6px 8px;
+    box-shadow: 0 2px 6px rgba(120, 80, 0, .12); display: flex; flex-direction: column; gap: 5px; }
+  .carta.cliccabile { cursor: pointer; }
+  .carta-num { position: absolute; top: -7px; left: -7px; z-index: 1; min-width: 26px; height: 26px; padding: 0 5px; border-radius: 13px;
+    background: #0B3A9E; color: #fff; font-weight: 800; font-size: .78rem; display: flex; align-items: center; justify-content: center; border: 2px solid #fff; }
+  .carta-img { aspect-ratio: 3 / 4; border-radius: 8px; overflow: hidden; background: #F3E6C4; }
+  .carta-img img { width: 100%; height: 100%; object-fit: cover; object-position: center 20%; display: block; }
+  .carta-nome { font-size: .72rem; font-weight: 750; text-align: center; line-height: 1.2; color: #5A3E00; }
+  .carta.coperta { background: linear-gradient(160deg, #1553E6, #0B3A9E); border-color: #0B3A9E; aspect-ratio: 3 / 4.6; align-items: center; justify-content: center; }
+  .carta.coperta .carta-num { background: #F5B82E; color: #3A2600; }
+  .carta-punto { color: rgba(255,255,255,.55); font-size: 2rem; font-weight: 800; }
+  .carta-riserva { position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(circle at 50% 38%, #FFF3C4, #E9C46A); color: #6A4A00; font-weight: 800; font-size: 1.6rem; }
+  .carta-riserva span { margin-top: 38%; }
+  .carta-riserva .aureola { position: absolute; top: 12%; width: 46%; aspect-ratio: 1; border-radius: 50%; border: 4px solid #F5B82E; opacity: .7; }
+  .carta.grande { max-width: 280px; margin: 8px auto 0; padding: 10px 10px 12px; }
+  .carta.grande .carta-num { width: 36px; height: 36px; border-radius: 18px; font-size: 1rem; top: -10px; left: -10px; }
+  .carta.grande .carta-nome { font-size: 1.05rem; }
+  .carta-desc { font-size: .86rem; color: var(--testo); text-align: center; line-height: 1.4; }
+  .carta-fonte { font-size: .72rem; color: var(--muto); text-align: center; }
+  .velo { position: fixed; inset: 0; z-index: 50; background: rgba(10, 20, 45, .55); display: flex; align-items: center; justify-content: center;
+    padding: 16px; animation: entra .2s ease-out; overflow-y: auto; }
+  .velo.via { opacity: 0; transition: opacity .2s; }
+  .finestra { position: relative; background: var(--superficie); border-radius: var(--raggio); padding: 20px 18px 16px; width: 100%; max-width: 380px;
+    max-height: calc(100vh - 32px); overflow-y: auto; overflow-x: hidden; }
+  @keyframes entra { from { opacity: 0; } to { opacity: 1; } }
+  .rivela-titolo { font-weight: 800; font-size: 1.15rem; text-align: center; margin-bottom: 6px; }
+  .rivela-carte { display: grid; gap: 18px; }
+  .gira { position: relative; perspective: 900px; }
+  .gira > .carta { animation: scopri .9s ease-out both; backface-visibility: hidden; }
+  .gira > .retro { position: absolute; inset: 8px 0 0; margin: 0 auto; max-width: 280px; border-radius: 12px; background: linear-gradient(160deg, #1553E6, #0B3A9E);
+    animation: copri .9s ease-out both; backface-visibility: hidden; }
+  @keyframes scopri { 0%, 35% { transform: rotateY(-180deg) scale(.9); } 100% { transform: rotateY(0) scale(1); } }
+  @keyframes copri { 0%, 35% { transform: rotateY(0) scale(.9); } 100% { transform: rotateY(180deg) scale(1); } }
+  .trofeo { position: relative; text-align: center; padding-top: 6px; }
+  .trofeo-icona { width: 150px; height: 150px; margin: 0 auto; animation: sali 1s cubic-bezier(.2, 1.4, .4, 1) both, brilla 2.4s ease-in-out 1s infinite; }
+  .trofeo-icona svg { width: 100%; height: 100%; }
+  .trofeo-titolo { font-size: 1.45rem; font-weight: 850; color: #A77400; margin-top: 6px; animation: entra .6s .6s both; }
+  @keyframes sali { from { transform: translateY(40px) scale(.4) rotate(-12deg); opacity: 0; } to { transform: none; opacity: 1; } }
+  @keyframes brilla { 0%, 100% { filter: drop-shadow(0 0 0 rgba(245,184,46,0)); } 50% { filter: drop-shadow(0 0 16px rgba(245,184,46,.9)); } }
+  .coriandoli { position: absolute; inset: -20px -18px auto; height: 260px; pointer-events: none; overflow: hidden; }
+  .coriandoli i { position: absolute; top: -12px; left: var(--x); width: 8px; height: 13px; background: var(--c); border-radius: 2px;
+    transform: rotate(var(--r)); animation: cade 2.2s var(--d) ease-in both; }
+  @keyframes cade { to { transform: translateY(280px) rotate(calc(var(--r) + 540deg)); opacity: 0; } }
+  .trofeo-mini { display: flex; align-items: center; gap: 8px; margin: 4px 0 10px; padding: 6px 14px 6px 6px; border-radius: 999px;
+    background: #FFF3DA; border: 1px solid #F3DCAC; font: inherit; color: #7A5200; cursor: pointer; }
+  .trofeo-mini span { width: 34px; height: 34px; display: block; }
+  .trofeo-mini svg { width: 100%; height: 100%; }
+  @media (prefers-reduced-motion: reduce) {
+    .gira > .carta, .gira > .retro, .trofeo-icona, .trofeo-titolo, .coriandoli i, .velo { animation: none; }
+    .gira > .retro { display: none; }
+  }
+
   /* PIN da mandare in privato */
   .pin-testa { display: flex; justify-content: space-between; align-items: center; font-weight: 700; margin: 16px 0 6px; }
   .pin-testa .conta { font-size: .82rem; color: var(--muto); font-weight: 650; }
@@ -500,7 +571,7 @@
    ===================================================================== */
 // Cambia a ogni modifica dell'interfaccia: compare in fondo alla scheda "Io",
 // così si capisce subito se il telefono sta eseguendo la versione aggiornata.
-const VERSIONE_APP = '2026.09.30c';
+const VERSIONE_APP = '2026.10.05c';
 
 /* =====================================================================
    CONFIGURAZIONE
@@ -683,25 +754,374 @@ async function apiInsieme(richieste) {
 
 function dataDaId(id) { return new Date(+id.slice(0,4), +id.slice(4,6)-1, +id.slice(6,8)); }
 function oggiId() { const d = new Date(); return d.getFullYear() + ('0'+(d.getMonth()+1)).slice(-2) + ('0'+d.getDate()).slice(-2); }
-function mostra(el) { document.getElementById('main').replaceChildren(el); window.scrollTo(0, 0); }
+function mostra(el) { S.giroMostra = (S.giroMostra || 0) + 1; document.getElementById('main').replaceChildren(el); window.scrollTo(0, 0); }
 function vuoto(testo) { return h('p', { class: 'vuoto' }, testo); }
 function errore(msg) { return h('div', { class: 'errore' }, msg); }
 
 /* =====================================================================
    AVVIO, ACCESSO, NAVIGAZIONE
    ===================================================================== */
+/* =====================================================================
+   VELOCITÀ: MEMORIA SUL TELEFONO
+   Ogni schermata mostra subito l'ultima versione salvata e intanto chiede
+   quella aggiornata; se è cambiata, la ridisegna senza far perdere il punto.
+   ===================================================================== */
+const CACHE_VER = 'c1';
+function chiaveCache(azione, dati) {
+  return 'oc_' + CACHE_VER + '_' + (S.utente ? S.utente.id : '') + '_' + azione + '_' + JSON.stringify(dati || {});
+}
+function leggiCache(k) {
+  try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; }
+}
+function scriviCache(k, v) {
+  try { localStorage.setItem(k, JSON.stringify(v)); }
+  catch (e) {   // spazio pieno: si buttano le copie vecchie e si riprova
+    try { svuotaCacheTelefono(); localStorage.setItem(k, JSON.stringify(v)); } catch (e2) { /* pazienza */ }
+  }
+}
+function svuotaCacheTelefono(soloAzioni) {
+  try {
+    Object.keys(localStorage).filter(k => k.indexOf('oc_') === 0)
+      .filter(k => !soloAzioni || soloAzioni.some(a => k.indexOf('_' + a + '_') > 0 || k.slice(-a.length - 1) === '_' + a))
+      .forEach(k => localStorage.removeItem(k));
+  } catch (e) { /* niente */ }
+}
+
+/**
+ * Chiama il server mostrando prima la copia salvata. disegna(d, daMemoria)
+ * può essere chiamata due volte: subito con la copia e poi con i dati nuovi
+ * (solo se sono diversi e se si è ancora sulla stessa schermata).
+ */
+async function apiVeloce(azione, dati, disegna) {
+  const k = chiaveCache(azione, dati);
+  const vecchio = leggiCache(k);
+  if (vecchio) disegna(vecchio, true);
+  const schermata = S.schermata, giro = S.giroMostra;
+  try {
+    const nuovo = await api(azione, dati);
+    scriviCache(k, nuovo);
+    const ancoraQui = S.schermata === schermata && S.giroMostra === giro;
+    const sta = document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
+    if (!vecchio) { if (S.schermata === schermata) disegna(nuovo, false); }   // se nel frattempo si è cambiata scheda, non si torna indietro
+    else if (ancoraQui && !sta && JSON.stringify(vecchio) !== JSON.stringify(nuovo)) {
+      const y = window.scrollY;
+      disegna(nuovo, false);
+      window.scrollTo(0, y);
+    }
+    return nuovo;
+  } catch (e) {
+    if (!vecchio) throw e;
+    toast('Connessione assente: ti mostro i dati salvati', true);
+    return vecchio;
+  }
+}
+
+/** Elenchi che cambiano di rado: in memoria per la sessione e salvati sul telefono. */
+function caricaConMemoria(campo, azione) {
+  if (S[campo]) return Promise.resolve(S[campo]);
+  const k = chiaveCache(azione, {});
+  const salvato = leggiCache(k);
+  const fresco = api(azione).then(d => { S[campo] = d; scriviCache(k, d); return d; });
+  if (salvato) { S[campo] = salvato; fresco.catch(() => {}); return Promise.resolve(salvato); }
+  return fresco;
+}
+/** Dopo una modifica: si dimentica la copia, così la prossima lettura è fresca. */
+function azzera(campo) {
+  S[campo] = null;
+  const azione = { giochi: 'giochi', calendario: 'calendario', animatori: 'elencoAnimatori', liste: 'liste' }[campo];
+  if (azione) try { localStorage.removeItem(chiaveCache(azione, {})); } catch (e) { /* niente */ }
+}
+
+/* =====================================================================
+   MERENDA E ACQUISTI — solo fra adulti
+   Un adulto segnala cosa serve (succhi, merendine o qualsiasi altra cosa),
+   gli altri ricevono la notifica e chi compra segna "comprato".
+   ===================================================================== */
+function bloccoMerenda(daComprare) {
+  const box = h('div', { class: 'modulo merenda' });
+  function disegna(lista) {
+    const cosa = h('input', { type: 'text', maxlength: '60', placeholder: 'Cosa serve? (es. bicchieri, palloni…)' });
+    const nota = h('input', { type: 'text', maxlength: '140', placeholder: 'Nota (facoltativa: quantità, marca…)' });
+    async function aggiungi(testo) {
+      const c = (testo || cosa.value).trim();
+      if (!c) { cosa.focus(); return; }
+      try {
+        const r = await api('segnalaMerenda', { cosa: c, nota: testo ? '' : nota.value });
+        toast(r.gia ? 'Era già in elenco' : 'Aggiunto: gli altri adulti ricevono la notifica');
+        svuotaCacheTelefono(['io', 'sabatoAdulti']);
+        disegna(r.daComprare);
+      } catch (err) { toast(String(err), true); }
+    }
+    box.replaceChildren(
+      h('div', { class: 'ria-testa' }, ['Da comprare', lista.length ? h('span', { class: 'etichetta ambra' }, String(lista.length)) : h('span', { class: 'etichetta verde' }, 'niente')]),
+      ...lista.map(m => h('div', { class: 'merenda-voce' }, [
+        h('div', {}, [h('b', {}, m.cosa), m.nota ? ' · ' + m.nota : '',
+          h('div', { class: 'piccolo muto' }, 'segnalato da ' + m.da + (m.il ? ' · ' + m.il : ''))]),
+        h('button', { class: 'b piccolo', onclick: async e => {
+          e.target.disabled = true;
+          try { const r = await api('compratoMerenda', { id: m.id }); toast('Segnato come comprato'); svuotaCacheTelefono(['io', 'sabatoAdulti']); disegna(r.daComprare); }
+          catch (err) { toast(String(err), true); e.target.disabled = false; }
+        } }, 'Comprato')
+      ])),
+      h('div', { class: 'piccolo muto', style: 'margin-top:10px' }, 'Per la merenda:'),
+      h('div', { class: 'azioni', style: 'margin-top:6px' }, [
+        h('button', { class: 'b secondario piccolo', onclick: () => aggiungi('Succhi') }, '+ Succhi'),
+        h('button', { class: 'b secondario piccolo', onclick: () => aggiungi('Merendine') }, '+ Merendine')
+      ]),
+      h('label', {}, 'Altro da comprare'), cosa, nota,
+      h('div', { class: 'azioni' }, h('button', { class: 'b piccolo', onclick: () => aggiungi('') }, 'Aggiungi'))
+    );
+  }
+  disegna(daComprare || []);
+  return box;
+}
+
+/* =====================================================================
+   ADULTI
+   Calendario, riepilogo dei sabati (cosa si fa e chi è responsabile),
+   turni di presenza fra adulti, merenda.
+   ===================================================================== */
+async function schermataSabatoAdulti(idData) {
+  mostra(h('p', { class: 'muto' }, 'Carico il sabato…'));
+  try { await apiVeloce('sabatoAdulti', idData ? { idData } : {}, d => mostra(vistaSabatoAdulti(d))); }
+  catch (e) { mostra(errore(e)); }
+}
+
+function vistaSabatoAdulti(d) {
+  const cal = d.calendario; cal.prossimo = d.prossimo;
+  const box = h('div', {}, intestazioneData(cal));
+  if (cal.tipo === 'Chiuso') {
+    box.appendChild(h('div', { class: 'chiuso' }, 'L\'oratorio è chiuso' + (cal.nota ? ': ' + cal.nota : '.')));
+    return box;
+  }
+  // 1. pianificazione del turno: la gestiscono tutti gli adulti, per chiunque
+  const turno = h('div', { class: 'modulo' });
+  function disegnaTurno(adulti) {
+    const passato = cal.idData < oggiId();
+    async function cambia(idAdulto, presente) {
+      try {
+        const r = await api('turnoAdulto', { idData: cal.idData, presente, idAdulto });
+        svuotaCacheTelefono(['io', 'sabatoAdulti']);
+        disegnaTurno(r.adulti);
+        return true;
+      } catch (err) { toast(String(err), true); return false; }
+    }
+    const fuori = (d.tuttiAdulti || []).filter(a => !adulti.some(x => x.id === a.id));
+    const scelta = select([{ v: '', t: 'Aggiungi al turno…' }].concat(fuori.map(a => ({ v: a.id, t: a.id === S.utente.id ? a.nomeVis + ' (io)' : a.nomeVis }))), '');
+    turno.replaceChildren(
+      h('div', { class: 'ria-testa' }, 'Di turno'),
+      h('div', { class: 'piccolo muto' }, 'Chi è di turno riceve il promemoria del sabato. Il turno lo potete organizzare tutti.'),
+      h('div', { class: 'inc-persone', style: 'margin-top:10px' }, adulti.length
+        ? adulti.map(a => h('span', { class: 'chip-persona' }, [a.nomeVis,
+            passato ? null : h('button', { class: 'chip-togli', 'aria-label': 'Togli ' + a.nomeVis + ' dal turno', onclick: async () => {
+              if (confirm('Togliere ' + a.nomeVis + ' dal turno di questo sabato?') && await cambia(a.id, false)) toast('Tolto dal turno');
+            } }, '×')]))
+        : h('span', { class: 'muto piccolo' }, 'Nessuno di turno.')),
+      passato || !fuori.length ? null : h('div', { style: 'display:flex;gap:8px;margin-top:10px' }, [
+        scelta,
+        h('button', { class: 'b piccolo', onclick: async () => {
+          if (!scelta.value) return;
+          const nome = (fuori.find(a => a.id === scelta.value) || {}).nomeVis;
+          if (await cambia(scelta.value, true)) toast(nome + ' è di turno');
+        } }, 'Aggiungi')
+      ])
+    );
+  }
+  disegnaTurno(d.adulti || []);
+  box.appendChild(turno);
+
+  // 2. presenza effettiva: ognuno solo per sé, anche se non è di turno
+  if (cal.idData >= oggiId()) box.appendChild(blocchettoPresenza(cal.idData, d.presenzaMia));
+  const chi = (d.presenti || []).map(a => a.nomeVis);
+  const via = (d.assenti || []).map(a => a.nomeVis);
+  box.appendChild(h('p', { class: 'piccolo muto', style: 'margin:4px 2px 0' },
+    (chi.length ? 'Hanno detto che ci sono: ' + chi.join(', ') : 'Nessun adulto ha ancora confermato la presenza') +
+    (via.length ? ' · Non ci sono: ' + via.join(', ') : '')));
+  box.appendChild(bloccoMerenda(d.merenda));
+
+  box.appendChild(h('h2', {}, 'Cosa si fa'));
+  if (!d.voci.length) box.appendChild(vuoto('Programma non ancora definito.'));
+  box.appendChild(h('div', { class: 'lista' }, d.voci.map(v => h('div', { class: 'riga' }, [
+    h('div', { class: 'titolo' }, v.attivita),
+    v.cosa ? h('div', {}, v.cosa) : null,
+    h('div', { class: 'sotto' }, v.responsabili.length ? 'Responsabile: ' + v.responsabili.join(', ') : 'Responsabile da definire')
+  ]))));
+  if (!d.prossimo) box.appendChild(h('div', { class: 'azioni' }, h('button', { class: 'b secondario', onclick: () => schermataSabato() }, 'Vai al prossimo sabato')));
+  return box;
+}
+
+function disegnaIoAdulto(d) {
+  const box = h('div', {}, [h('h2', { style: 'margin-top:4px' }, d.utente.nomeVis), h('p', { class: 'muto' }, 'Adulto')]);
+  box.appendChild(h('h2', {}, 'I miei turni'));
+  if (!d.turni.length) box.appendChild(vuoto('Non sei di turno nei prossimi sabati. Il turno si organizza aprendo un sabato dal calendario.'));
+  else box.appendChild(h('div', { class: 'lista' }, d.turni.map(t => h('div', { class: 'riga cliccabile', onclick: () => { segnaNav('sabato'); schermataSabato(t.idData); } }, [
+    h('div', { class: 'titolo' }, [t.testo,
+      t.presenza === 'presente' ? h('span', { class: 'etichetta verde' }, 'ci sono')
+        : t.presenza === 'assente' ? h('span', { class: 'etichetta rossa' }, 'non ci sono') : h('span', { class: 'etichetta ambra' }, 'da confermare')]),
+    h('div', { class: 'sotto' }, 'Di turno in oratorio')]))));
+  box.appendChild(h('h2', {}, 'Merenda e acquisti'));
+  box.appendChild(bloccoMerenda(d.merenda));
+  box.appendChild(h('h2', {}, 'Notifiche'));
+  box.appendChild(h('p', { class: 'piccolo muto', style: 'margin-top:-6px' }, 'Ricevi gli eventi della parrocchia, il promemoria dei sabati in cui sei di turno e le richieste di acquisto degli altri adulti.'));
+  const areaNotifiche = h('div');
+  box.appendChild(areaNotifiche);
+  disegnaNotifiche(areaNotifiche);
+  box.appendChild(h('div', { class: 'azioni', style: 'margin-top:28px' }, h('button', { class: 'b secondario', onclick: esci }, 'Esci')));
+  box.appendChild(h('p', { class: 'muto piccolo', style: 'text-align:center;margin-top:18px' }, [
+    h('a', { href: URL_SITO + 'guida.html', target: '_blank', rel: 'noopener' }, 'Come funziona l\'app'), ' · Versione ' + VERSIONE_APP]));
+  mostra(box);
+}
+
+/* =====================================================================
+   COLLEZIONE DEI SANTI
+   ===================================================================== */
+const ICONA_TROFEO = '<svg viewBox="0 0 120 120" aria-hidden="true"><defs><linearGradient id="oro" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFE48A"/><stop offset=".5" stop-color="#F5B82E"/><stop offset="1" stop-color="#C98A0B"/></linearGradient></defs>' +
+  '<path d="M36 18h48v22c0 15-10 27-24 27S36 55 36 40z" fill="url(#oro)"/>' +
+  '<path d="M36 26H22v6c0 11 8 19 18 20M84 26h14v6c0 11-8 19-18 20" fill="none" stroke="#E0A21C" stroke-width="6" stroke-linecap="round"/>' +
+  '<rect x="54" y="66" width="12" height="16" fill="#E0A21C"/><path d="M40 82h40l4 14H36z" fill="url(#oro)"/>' +
+  '<rect x="32" y="96" width="56" height="9" rx="3" fill="#8A5A00"/>' +
+  '<path d="M60 28l3.5 7.2 7.9 1.1-5.7 5.5 1.4 7.9L60 46l-7.1 3.7 1.4-7.9-5.7-5.5 7.9-1.1z" fill="#fff" opacity=".9"/></svg>';
+
+/** Illustrazione di riserva se l'immagine non c'è o non si carica: un'aureola con le iniziali. */
+function illustrazioneRiserva(nome) {
+  const iniziali = (nome || '?').replace(/^(Sant'|Santa|Santo|San)\s*/i, '').split(/\s+/)
+    .filter(p => /^[A-ZÀ-Ý]/.test(p)).slice(0, 2).map(p => p.charAt(0)).join('') || '?';
+  return h('div', { class: 'carta-riserva' }, [h('div', { class: 'aureola' }), h('span', {}, iniziali)]);
+}
+function immagineCarta(c) {
+  if (!c.immagine) return illustrazioneRiserva(c.nome);
+  const img = h('img', { src: c.immagine, alt: c.nome, loading: 'lazy', referrerpolicy: 'no-referrer' });
+  img.onerror = () => img.replaceWith(illustrazioneRiserva(c.nome));
+  return img;
+}
+
+function cartaSanto(c, grande) {
+  if (!c.trovata) {
+    return h('div', { class: 'carta coperta' }, [h('div', { class: 'carta-num' }, c.numero), h('div', { class: 'carta-punto' }, '?')]);
+  }
+  return h('div', { class: 'carta' + (grande ? ' grande' : '') }, [
+    h('div', { class: 'carta-num' }, c.numero),
+    h('div', { class: 'carta-img' }, immagineCarta(c)),
+    h('div', { class: 'carta-nome' }, c.nome),
+    grande ? h('div', { class: 'carta-desc' }, c.descrizione) : null,
+    grande && (c.sabato || c.fonte) ? h('div', { class: 'carta-fonte' }, [
+      c.sabato ? 'Trovata sabato ' + c.sabato : '',
+      c.sabato && c.fonte ? ' · ' : '',
+      c.fonte ? h('a', { href: c.fonte, target: '_blank', rel: 'noopener' }, 'immagine da Wikipedia') : null
+    ]) : null
+  ]);
+}
+
+function finestra(contenuto, classe) {
+  const velo = h('div', { class: 'velo ' + (classe || ''), onclick: e => { if (e.target === velo) chiudi(); } });
+  const chiudi = () => { velo.classList.add('via'); setTimeout(() => velo.remove(), 200); };
+  velo.appendChild(h('div', { class: 'finestra' }, [contenuto, h('button', { class: 'b largo', style: 'margin-top:14px', onclick: chiudi }, 'Chiudi')]));
+  document.body.appendChild(velo);
+  return chiudi;
+}
+
+/** La carta (o le carte) appena trovate, girata con un'animazione; poi l'eventuale trofeo. */
+function mostraCarteNuove(riep) {
+  if (!riep || !riep.nuove || !riep.nuove.length) return;
+  let viste = [];
+  try { viste = JSON.parse(localStorage.getItem('oc_carte_viste_' + S.utente.id) || '[]'); } catch (e) { viste = []; }
+  const nuove = riep.nuove.filter(c => viste.indexOf(c.numero) < 0);
+  if (!nuove.length) return;
+  try { localStorage.setItem('oc_carte_viste_' + S.utente.id, JSON.stringify(viste.concat(nuove.map(c => c.numero)))); } catch (e) { /* niente */ }
+  svuotaCacheTelefono(['collezione']);
+  const giro = h('div', { class: 'rivela' }, [
+    h('div', { class: 'rivela-titolo' }, nuove.length === 1 ? 'Hai trovato una nuova carta!' : 'Hai trovato ' + nuove.length + ' nuove carte!'),
+    h('div', { class: 'rivela-carte' }, nuove.map(c => h('div', { class: 'gira' }, [h('div', { class: 'retro' }), cartaSanto(c, true)]))),
+    h('div', { class: 'piccolo muto', style: 'text-align:center;margin-top:8px' }, 'Grazie per essere venuto all\'oratorio!')
+  ]);
+  const chiudi = finestra(giro, 'velo-carte');
+  if (riep.trofeoNuovo || riep.completa) {
+    const vecchioChiudi = chiudi;
+    document.querySelector('.velo-carte .finestra > .b').onclick = () => { vecchioChiudi(); setTimeout(mostraTrofeo, 250); };
+  }
+}
+
+function mostraTrofeo() {
+  const coriandoli = h('div', { class: 'coriandoli' }, Array.from({ length: 40 }, (_, i) =>
+    h('i', { style: '--x:' + Math.round(Math.random() * 100) + '%;--r:' + Math.round(Math.random() * 360) + 'deg;--d:' + (Math.random() * 0.8).toFixed(2) + 's;--c:' + ['#F5B82E', '#1553E6', '#6B3FBF', '#19A35B', '#E5484D'][i % 5] })));
+  finestra(h('div', { class: 'trofeo' }, [
+    coriandoli,
+    h('div', { class: 'trofeo-icona', html: ICONA_TROFEO }),
+    h('div', { class: 'trofeo-titolo' }, 'Collezionista di Santi'),
+    h('p', {}, 'Hai trovato tutte le carte! Grazie per esserci stato quasi ogni sabato.')
+  ]), 'velo-trofeo');
+}
+
+async function schermataCollezione() {
+  segnaNav('io');
+  mostra(h('p', { class: 'muto' }, 'Apro la collezione…'));
+  try { await apiVeloce('collezione', {}, (d, daMemoria) => { disegnaCollezione(d); if (!daMemoria) mostraCarteNuove(d); }); }
+  catch (e) { mostra(errore(e)); }
+}
+
+function disegnaCollezione(d) {
+  const pct = Math.round(d.trovate / d.totale * 100);
+  const griglia = h('div', { class: 'griglia-carte' }, d.carte.map(c => {
+    const el = cartaSanto(c, false);
+    if (c.trovata) { el.classList.add('cliccabile'); el.onclick = () => finestra(cartaSanto(c, true), 'velo-carte'); }
+    return el;
+  }));
+  mostra(h('div', {}, [
+    h('div', { class: 'azioni', style: 'margin-top:0' }, h('button', { class: 'b secondario piccolo', onclick: () => vai('io') }, '← Io')),
+    h('h2', {}, 'Collezione dei santi'),
+    d.completa ? h('button', { class: 'trofeo-mini', onclick: mostraTrofeo }, [h('span', { html: ICONA_TROFEO }), h('b', {}, 'Collezionista di Santi')]) : null,
+    h('div', { class: 'progresso' }, [h('div', { class: 'progresso-barra' }, h('i', { style: 'width:' + pct + '%' })),
+      h('div', { class: 'piccolo' }, [h('b', {}, d.trovate + ' di ' + d.totale), ' carte trovate'])]),
+    h('p', { class: 'piccolo muto' }, 'Ogni sabato in cui dici "Ci sono" trovi una carta che non hai ancora: si sblocca il giorno stesso. Trovale tutte per diventare Collezionista di Santi.'),
+    griglia
+  ]));
+}
+
+function bloccoCollezioneIo(c) {
+  if (!c) return null;
+  return h('button', { class: 'collezione-io', onclick: schermataCollezione }, [
+    h('div', { class: 'mazzetto' }, [h('i'), h('i'), h('i')]),
+    h('div', { style: 'flex:1;text-align:left' }, [
+      h('div', { style: 'font-weight:750' }, 'Collezione dei santi'),
+      h('div', { class: 'piccolo muto' }, c.completa ? 'Completa! Sei Collezionista di Santi' : c.trovate + ' di ' + c.totale + ' carte trovate')
+    ]),
+    icona('vai', 'vai')
+  ]);
+}
+
 async function avvio() {
   if (!S.token) return schermataAccesso();
+  // 1. subito l'ultima versione salvata sul telefono, se c'è
+  const kAvvio = 'oc_' + CACHE_VER + '_avvio';
+  const salvato = leggiCache(kAvvio);
+  if (salvato && salvato.io) {
+    S.utente = salvato.io.utente;
+    dopoAccesso();
+    if (S.utente.adulto) schermataSabato();
+    else if (salvato.sabato) mostra(vistaSabato(salvato.sabato));
+  }
+  // 2. intanto i dati aggiornati: chi sono e il prossimo sabato, in un solo viaggio
   try {
-    // chi sono e il prossimo sabato: un solo viaggio al server
     const [io, sabato] = await apiInsieme(['io', 'prossimoSabato']);
     if (!io.ok) throw io.errore;
+    const prima = S.utente;
     S.utente = io.dati.utente;
-    dopoAccesso();
-    schermataSabato(null, sabato.ok ? sabato.dati : null);
+    scriviCache(kAvvio, { io: io.dati, sabato: sabato.ok ? sabato.dati : null });
+    scriviCache(chiaveCache('io', {}), io.dati);
+    if (!prima || prima.livello !== S.utente.livello || prima.grado !== S.utente.grado) {
+      dopoAccesso();
+      schermataSabato(null, S.utente.adulto ? null : (sabato.ok ? sabato.dati : null));
+    } else if (!S.utente.adulto && S.schermata === 'sabato' && sabato.ok && JSON.stringify(sabato.dati) !== JSON.stringify(salvato.sabato)) {
+      const y = window.scrollY; mostra(vistaSabato(sabato.dati)); window.scrollTo(0, y);
+    }
+    mostraCarteNuove(io.dati.collezione);
+    // in sottofondo: calendario e giochi, così le altre schede si aprono subito
+    setTimeout(() => { caricaCalendario().catch(() => {}); if (!S.utente.adulto) caricaGiochi().catch(() => {}); }, 1500);
   } catch (e) {
-    S.token = null; localStorage.removeItem('oratorio_token');
-    schermataAccesso();
+    if (!salvato || !S.token) {
+      S.token = null; localStorage.removeItem('oratorio_token');
+      schermataAccesso();
+    } else toast('Connessione assente: ti mostro i dati salvati', true);
   }
 }
 
@@ -802,7 +1222,12 @@ function dopoAccesso() {
   document.getElementById('chi').textContent = S.utente.nomeVis + ' · ' + S.utente.grado;
   const nav = document.getElementById('nav');
   nav.classList.remove('nascosto');
-  const voci = [
+  // gli adulti hanno solo il sabato (in riepilogo), il calendario e la loro scheda
+  const voci = S.utente.adulto ? [
+    ['sabato', 'sabato', 'Sabato'],
+    ['calendario', 'anno', 'Anno'],
+    ['io', 'io', 'Io']
+  ] : [
     ['sabato', 'sabato', 'Sabato'],
     ['io', 'io', 'Io'],
     ['calendario', 'anno', 'Anno'],
@@ -833,27 +1258,27 @@ function vai(nome) {
 function esci() {
   S.token = null; S.utente = null;
   localStorage.removeItem('oratorio_token');   // il codice oratorio resta
+  svuotaCacheTelefono();                        // niente dati di questa persona sul telefono
+  S.giochi = null; S.calendario = null; S.animatori = null; S.liste = null;
   schermataAccesso('Sessione terminata. Accedi di nuovo.');
 }
 
 /* Elenchi condivisi (in memoria per tutta la sessione) */
-async function caricaAnimatori() { if (!S.animatori) S.animatori = await api('elencoAnimatori'); return S.animatori; }
-async function caricaGiochi() { if (!S.giochi) S.giochi = await api('giochi'); return S.giochi; }
-async function caricaListe() { if (!S.liste) S.liste = await api('liste'); return S.liste; }
-async function caricaCalendario() { if (!S.calendario) S.calendario = await api('calendario'); return S.calendario; }
+async function caricaAnimatori() { return caricaConMemoria('animatori', 'elencoAnimatori'); }
+async function caricaGiochi() { return caricaConMemoria('giochi', 'giochi'); }
+async function caricaListe() { return caricaConMemoria('liste', 'liste'); }
+async function caricaCalendario() { return caricaConMemoria('calendario', 'calendario'); }
 
 /* =====================================================================
    SCHERMATA 2 — SABATO
    ===================================================================== */
 async function schermataSabato(idData, giaCaricato) {
   segnaNav('sabato');
-  let d = giaCaricato;
-  if (!d) {
-    mostra(h('p', { class: 'muto' }, 'Carico il programma…'));
-    try { d = await (idData ? api('sabato', { idData }) : api('prossimoSabato')); }
-    catch (e) { mostra(errore(e)); return; }
-  }
-  mostra(vistaSabato(d));
+  if (S.utente && S.utente.adulto) return schermataSabatoAdulti(idData);
+  if (giaCaricato) { mostra(vistaSabato(giaCaricato)); return; }
+  mostra(h('p', { class: 'muto' }, 'Carico il programma…'));
+  try { await apiVeloce(idData ? 'sabato' : 'prossimoSabato', idData ? { idData } : {}, d => mostra(vistaSabato(d))); }
+  catch (e) { mostra(errore(e)); }
 }
 
 function intestazioneData(cal) {
@@ -913,6 +1338,10 @@ function vistaSabato(d) {
         tendina('Attività e gioco libero', attivita.length + d.ricorrenti.length, dentro, mie)));
     }
   }
+  // adulti presenti: solo per i sabati aperti non ancora passati
+  if (cal.tipo !== 'Chiuso' && cal.idData >= oggiId()) {
+    if (d.adulti && d.adulti.length) box.appendChild(h('p', { class: 'piccolo muto', style: 'margin:14px 2px 0' }, 'Adulti di turno: ' + d.adulti.map(a => a.nomeVis).join(', ')));
+  }
   // volantini approvati per questo sabato, pronti da mandare sui gruppi
   if (d.volantini && d.volantini.length) {
     box.appendChild(h('h2', {}, 'Volantino'));
@@ -938,13 +1367,21 @@ function testoPersone(persone) {
 function blocchettoPresenza(idData, stato) {
   const si = h('button', { class: stato === 'presente' ? 'on' : '' }, 'Ci sono');
   const no = h('button', { class: stato === 'assente' ? 'on no' : '' }, 'Non ci sono');
+  // la scelta si vede subito; se il server non risponde si torna indietro
   async function salva(presente) {
+    const prima = [si.className, no.className];
+    si.className = presente ? 'on' : '';
+    no.className = presente ? '' : 'on no';
+    toast(presente ? 'Presenza confermata' : 'Assenza registrata');
     try {
       const r = await api('salvaPresenza', { idData, stato: presente });
-      si.className = r.stato === 'presente' ? 'on' : '';
-      no.className = r.stato === 'assente' ? 'on no' : '';
-      toast(r.stato === 'presente' ? 'Presenza confermata' : 'Assenza registrata');
-    } catch (e) { toast(e, true); }
+      svuotaCacheTelefono(['io', 'prossimoSabato', 'sabato', 'avvio', 'sabatoAdulti']);
+      if (S.utente.adulto && S.schermata === 'sabato') schermataSabatoAdulti(idData);   // aggiorna l'elenco di chi c'è
+      if (r.nuoveCarte && r.nuoveCarte.length) mostraCarteNuove({ nuove: r.nuoveCarte, trofeoNuovo: r.trofeoNuovo });
+    } catch (e) {
+      si.className = prima[0]; no.className = prima[1];
+      toast('Non salvato: ' + e, true);
+    }
   }
   si.onclick = () => salva(true);
   no.onclick = () => salva(false);
@@ -1080,8 +1517,12 @@ async function moduloProgramma(v, dopo, annulla) {
    ===================================================================== */
 async function schermataIo() {
   mostra(h('p', { class: 'muto' }, 'Carico la tua scheda…'));
-  let d;
-  try { d = await api('io'); } catch (e) { mostra(errore(e)); return; }
+  try { await apiVeloce('io', {}, (d, daMemoria) => { disegnaIo(d); if (!daMemoria) mostraCarteNuove(d.collezione); }); }
+  catch (e) { mostra(errore(e)); }
+}
+
+function disegnaIo(d) {
+  if (d.utente.adulto) return disegnaIoAdulto(d);
   const box = h('div', {}, [
     h('h2', { style: 'margin-top:4px' }, d.utente.nomeVis),
     h('p', { class: 'muto' }, d.utente.grado)
@@ -1091,6 +1532,7 @@ async function schermataIo() {
     box.appendChild(h('p', { class: 'piccolo muto', style: 'margin-top:14px' }, 'Prossimo sabato: ' + d.prossimo.testo));
     if (d.utente.disponibilita !== 'nessuno') box.appendChild(blocchettoPresenza(d.prossimo.idData, d.presenzaProssimo));
   }
+  if (d.collezione) box.appendChild(bloccoCollezioneIo(d.collezione));
 
   box.appendChild(h('h2', {}, 'I miei incarichi'));
   const futuri = d.incarichi.filter(i => i.futuro), passati = d.incarichi.filter(i => !i.futuro);
@@ -1345,13 +1787,15 @@ const GIORNI_BREVI = ['dom', 'lun', 'mar', 'mer', 'gio', 'ven', 'sab'];
 async function schermataCalendario() {
   segnaNav('calendario');
   mostra(h('p', { class: 'muto' }, 'Carico il calendario…'));
-  let c, ev;
   try {
-    c = await caricaCalendario();
-    const risposta = await api('eventi');
-    ev = risposta.eventi;
-    S.volEventi = risposta.volantini || {};
-  } catch (e) { mostra(errore(e)); return; }
+    const c = await caricaCalendario();
+    await apiVeloce('eventi', {}, risposta => disegnaAnno(S.calendario || c, risposta));
+  } catch (e) { mostra(errore(e)); }
+}
+
+function disegnaAnno(c, risposta) {
+  const ev = risposta.eventi;
+  S.volEventi = risposta.volantini || {};
   if (!c.sabati.length) { mostra(vuoto('Calendario vuoto.')); return; }
 
   const oggi = oggiId();
@@ -1489,7 +1933,7 @@ async function moduloGioco(area, esistente, annulla, dopoSalvato) {
     salva.disabled = true;
     try {
       const r = await api(esistente ? 'modificaGioco' : 'nuovoGioco', dati);
-      S.giochi = null;
+      azzera('giochi');
       toast(esistente ? 'Scheda aggiornata' : 'Gioco aggiunto');
       if (dopoSalvato) dopoSalvato(r); else apriGioco(r.id);
     } catch (e) { msg.replaceChildren(errore(e)); salva.disabled = false; }
@@ -1939,7 +2383,7 @@ function vistaDaSistemare(area, d, ricarica) {
     conferma.disabled = true;
     try {
       const r = await api('applicaRiassegnazioni', { modifiche });
-      S.animatori = null;
+      azzera('animatori');
       toast(r.fatte + ' incarichi riassegnati');
       if (r.saltate.length) alert('Fatto. Alcune erano già cambiate:\n\n' + r.saltate.join('\n'));
       ricarica('sistemare');
@@ -2388,7 +2832,7 @@ async function gestioneEventi(cont, apriId) {
           avvisa: avvisa.checked
         });
         toast(e.id ? 'Evento aggiornato' : 'Evento aggiunto');
-        S.calendario = null;
+        azzera('calendario');
         schermataGestione('eventi', r.id);
       } catch (err) { msg.replaceChildren(errore(err)); salva.disabled = false; }
     } }, e.id ? 'Salva' : 'Aggiungi l\'evento');
@@ -2879,7 +3323,7 @@ async function adminControlli(cont) {
 }
 
 async function adminCalendario(cont) {
-  S.calendario = null; await caricaCalendario();
+  azzera('calendario'); await caricaCalendario();
   const area = h('div');
   const sel = selettoreData(null, S.calendario.sabati[0].idData, disegna);
   cont.replaceChildren(h('label', {}, 'Sabato'), sel, area);
@@ -2927,7 +3371,7 @@ async function adminAnagrafica(cont) {
       try {
         await api('salvaAnagrafica', { id: a.id, nome: nome.value, cognome: cognome.value, nomeVis: nomeVis.value, anno: anno.value, grado: grado.value, attivo: attivo.checked, contatto: contatto.value, disponibilita: disponibilita.value });
         if (disponibilita.value !== 'tutto' && disponibilita.value !== (a.disponibilita || 'tutto')) toast('Ora sistema i suoi incarichi in Gestione → Incarichi');
-        S.animatori = null; toast('Anagrafica salvata'); schermataAdmin('anagrafica');
+        azzera('animatori'); toast('Anagrafica salvata'); schermataAdmin('anagrafica');
       } catch (e) { toast(e, true); }
     } }, 'Salva');
     area.replaceChildren(h('div', { class: 'modulo' }, [
@@ -2955,12 +3399,12 @@ async function adminSquadre(cont) {
     const membri = d.squadre.filter(q => q.idAtt === sel.value).sort((a, b) => (a.ruolo === 'Responsabile' ? 0 : 1) - (b.ruolo === 'Responsabile' ? 0 : 1) || a.nomeVis.localeCompare(b.nomeVis, 'it'));
     const righe = membri.map(q => {
       const ruolo = select(d.ruoli, q.ruolo); ruolo.style.width = 'auto'; ruolo.style.minHeight = '36px';
-      ruolo.onchange = async () => { try { await api('salvaSquadra', { idAtt: q.idAtt, idAnimatore: q.idAnimatore, ruolo: ruolo.value }); q.ruolo = ruolo.value; toast('Aggiornato'); } catch (e) { toast(e, true); } };
+      ruolo.onchange = async () => { try { const r = await api('salvaSquadra', { idAtt: q.idAtt, idAnimatore: q.idAnimatore, ruolo: ruolo.value }); q.ruolo = ruolo.value; dopoSquadra(r, 'Ruolo aggiornato'); } catch (e) { toast(e, true); } };
       return h('div', { style: 'display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--linea)' }, [
         h('span', { style: 'flex:1' }, q.nomeVis), ruolo,
         h('button', { class: 'b pericolo piccolo', onclick: async () => {
           if (!confirm('Togliere ' + q.nomeVis + ' dalla squadra?')) return;
-          try { await api('rimuoviSquadra', { idAtt: q.idAtt, idAnimatore: q.idAnimatore }); d.squadre = d.squadre.filter(x => x !== q); disegna(); toast('Rimosso'); } catch (e) { toast(e, true); }
+          try { const r = await api('rimuoviSquadra', { idAtt: q.idAtt, idAnimatore: q.idAnimatore }); d.squadre = d.squadre.filter(x => x !== q); disegna(); dopoSquadra(r, 'Tolto'); } catch (e) { toast(e, true); }
         } }, 'Togli')
       ]);
     });
@@ -2974,11 +3418,29 @@ async function adminSquadre(cont) {
         const a = d.animatori.find(x => x.id === nuovo.value);
         d.squadre = d.squadre.filter(x => !(x.idAtt === sel.value && x.idAnimatore === nuovo.value));
         d.squadre.push({ idAtt: sel.value, idAnimatore: a.id, nomeVis: a.nomeVis, ruolo: r.ruolo });
-        disegna(); toast('Aggiunto');
+        disegna(); dopoSquadra(r, 'Aggiunto');
       } catch (e) { toast(e, true); }
     } }, 'Aggiungi');
+    const nomeAtt = ((d.attivita || []).find(x => x.id === sel.value) || {}).nome || '';
+    const allinea = h('button', { class: 'b secondario', onclick: async () => {
+      if (!confirm('Rendere tutti i sabati futuri di "' + nomeAtt + '" uguali a questa squadra?\n\nChi non è nella squadra verrà tolto da quei sabati (anche se ce l\'aveva messo la ridistribuzione), chi manca verrà aggiunto.')) return;
+      allinea.disabled = true;
+      try {
+        const r = await api('allineaSquadra', { idAtt: sel.value });
+        svuotaCacheTelefono(['sabato', 'prossimoSabato', 'avvio', 'io', 'incarichi', 'gestioneSabato']);
+        toast(r.sabati + ' sabati allineati: ' + r.aggiunti + ' aggiunte, ' + r.tolti + ' tolte');
+      } catch (e) { toast(e, true); }
+      allinea.disabled = false;
+    } }, 'Allinea i sabati futuri a questa squadra');
     area.replaceChildren(...righe, righe.length ? null : vuoto('Nessun membro.'),
-      h('div', { style: 'display:grid;grid-template-columns:1fr auto auto;gap:6px;margin-top:10px;align-items:center' }, [nuovo, ruoloNuovo, btn]));
+      h('div', { style: 'display:grid;grid-template-columns:1fr auto auto;gap:6px;margin-top:10px;align-items:center' }, [nuovo, ruoloNuovo, btn]),
+      h('p', { class: 'piccolo muto', style: 'margin-top:18px' }, 'Ogni modifica alla squadra vale anche per i sabati già in programma, da oggi in poi. Se i sabati futuri sono stati cambiati a mano e vuoi ripartire dalla squadra, usa il pulsante qui sotto.'),
+      righe.length ? h('div', { class: 'azioni', style: 'margin-top:4px' }, allinea) : null);
+  }
+  /** Dopo una modifica: avviso con i sabati aggiornati e copie del telefono da rifare. */
+  function dopoSquadra(r, testo) {
+    svuotaCacheTelefono(['sabato', 'prossimoSabato', 'avvio', 'io', 'incarichi', 'gestioneSabato']);
+    toast(testo + (r && r.sabati ? ' · aggiornati ' + r.sabati + ' sabati futuri' : ''));
   }
   disegna();
 }
