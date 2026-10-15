@@ -550,6 +550,34 @@
   #attesa.on { display: block; animation: scorri 1s linear infinite; }
   @keyframes scorri { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
   @media (prefers-reduced-motion: reduce) { #attesa.on { animation: none; } #toast { transition: none; } }
+
+  /* appello, sabati in anticipo, riepiloghi */
+  .scelta-due { display: flex; gap: 5px; flex: none; }
+  .scelta-due button { min-height: 38px; padding: 0 12px; border-radius: 999px; border: 1.5px solid var(--linea); background: var(--superficie);
+    font: inherit; font-size: .84rem; font-weight: 650; color: var(--muto); cursor: pointer; }
+  .scelta-due button.on { background: var(--blu); border-color: var(--blu); color: #fff; }
+  .scelta-due button.on.no { background: var(--rosso); border-color: var(--rosso); }
+  .riga-scelta { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--linea); }
+  .riga-scelta:first-child { border-top: 0; }
+  .riga-scelta .chi { flex: 1; min-width: 0; font-weight: 650; }
+  .riga-scelta .chi small { display: block; font-weight: 500; color: var(--muto); font-size: .78rem; }
+  .riga-scelta .chi small.si { color: #19703F; }
+  .riga-scelta .chi small.no { color: var(--rosso); }
+  .numeri { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; margin: 10px 0; }
+  .numero { background: var(--fondo); border-radius: var(--raggio-xs); padding: 10px 12px; }
+  .numero b { display: block; font-size: 1.35rem; font-weight: 800; color: var(--blu-scuro); font-variant-numeric: tabular-nums; }
+  .numero span { font-size: .78rem; color: var(--muto); }
+  .anno-riga { font-size: .8rem; color: var(--muto); margin-top: 3px; }
+  .tabella-semplice { width: 100%; border-collapse: collapse; font-size: .9rem; }
+  .tabella-semplice td { padding: 6px 4px; border-top: 1px solid var(--linea); }
+  .tabella-semplice td:last-child { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .punti-box { display: flex; align-items: center; gap: 12px; background: var(--blu-tenue); border-radius: var(--raggio-s); padding: 12px 14px; margin: 10px 0; }
+  .punti-box b { font-size: 1.3rem; color: var(--blu-scuro); }
+  @media print {
+    #nav, #barra, .schede, .no-stampa, #toast, #attesa { display: none !important; }
+    body { background: #fff; }
+    .modulo { box-shadow: none; break-inside: avoid; }
+  }
 </style>
 </head>
 <body>
@@ -571,7 +599,7 @@
    ===================================================================== */
 // Cambia a ogni modifica dell'interfaccia: compare in fondo alla scheda "Io",
 // così si capisce subito se il telefono sta eseguendo la versione aggiornata.
-const VERSIONE_APP = '2026.10.05d';
+const VERSIONE_APP = '2026.10.14';
 
 /* =====================================================================
    CONFIGURAZIONE
@@ -950,6 +978,90 @@ function vistaSabatoAdulti(d) {
   return box;
 }
 
+/* =====================================================================
+   SCELTE RAPIDE, SABATI IN ANTICIPO, IL MIO ANNO, CALENDARIO SUL TELEFONO
+   ===================================================================== */
+/**
+ * Due pulsanti affiancati (es. "Ci sono" / "Non ci sono"). La scelta si vede
+ * subito; se il salvataggio fallisce si torna indietro. valori = [vSi, vNo].
+ */
+function sceltaDue(valore, testi, valori, salva) {
+  const si = h('button', {}, testi[0]), no = h('button', {}, testi[1]);
+  function segna(v) { si.className = v === valori[0] ? 'on' : ''; no.className = v === valori[1] ? 'on no' : ''; }
+  segna(valore);
+  async function scegli(v) {
+    const prima = valore;
+    if (v === valore && valori.length > 2) v = valori[2];   // ritoccare la stessa scelta la toglie (se previsto)
+    valore = v; segna(v);
+    try { await salva(v); } catch (e) { valore = prima; segna(prima); toast('Non salvato: ' + e, true); }
+  }
+  si.onclick = () => scegli(valori[0]);
+  no.onclick = () => scegli(valori[1]);
+  return h('div', { class: 'scelta-due' }, [si, no]);
+}
+
+/** Tutti i sabati da qui a fine anno: si può dire subito quelli in cui non si sarà. */
+function bloccoMieiSabati(lista) {
+  if (!lista || !lista.length) return null;
+  const senza = lista.filter(x => x.presenza === 'nessuna').length;
+  const righe = lista.map(x => h('div', { class: 'riga-scelta' }, [
+    h('div', { class: 'chi' }, [x.breve + (x.evento ? ' · ' + x.evento : '') + (x.serata ? ' · serata' : ''),
+      h('small', {}, x.incarichi ? (x.incarichi === 1 ? 'hai un incarico' : 'hai ' + x.incarichi + ' incarichi') : 'nessun incarico per te')]),
+    sceltaDue(x.presenza, ['Ci sono', 'No'], ['presente', 'assente'], async v => {
+      const r = await api('salvaPresenza', { idData: x.idData, stato: v === 'presente' });
+      x.presenza = v;
+      svuotaCacheTelefono(['io', 'prossimoSabato', 'sabato', 'avvio']);
+      if (r.nuoveCarte && r.nuoveCarte.length) mostraCarteNuove({ nuove: r.nuoveCarte, trofeoNuovo: r.trofeoNuovo });
+    })
+  ]));
+  return h('div', { style: 'margin-top:10px' }, tendina('I miei sabati', senza ? senza + ' senza risposta' : 'tutti risposti',
+    h('div', {}, [h('p', { class: 'piccolo muto', style: 'margin:0 0 6px' }, 'Se sai già che un sabato non ci sarai, dillo qui: chi organizza non ti assegna incarichi quel giorno.')].concat(righe))));
+}
+
+/** Il mio anno: presenze, eventi, punti, incarichi, carte. */
+function bloccoMioAnno(a) {
+  if (!a) return null;
+  const n = (num, testo) => h('div', { class: 'numero' }, [h('b', {}, String(num)), h('span', {}, testo)]);
+  return h('div', {}, [
+    h('h2', {}, 'Il mio anno'),
+    h('div', { class: 'numeri' }, [
+      n(a.presenze + '/' + a.sabati, 'sabati presente (' + a.percentuale + '%)'),
+      n(a.eventi, a.eventi === 1 ? 'evento' : 'eventi'),
+      n(a.punti, 'punti'),
+      n(a.incarichi.fatti, 'incarichi svolti'),
+      n(a.carte + '/' + a.totaleCarte, 'carte')
+    ])
+  ]);
+}
+
+/** Abbonamento al calendario personale (Google Calendar, iPhone). */
+function bloccoCalendarioTelefono() {
+  const box = h('div', { class: 'modulo' });
+  const spiega = h('p', { class: 'muto piccolo', style: 'margin:0' }, S.utente.adulto
+    ? 'I sabati in cui sei di turno compaiono da soli nel calendario del telefono.'
+    : 'I sabati, con i tuoi incarichi, e gli eventi per animatori compaiono da soli nel calendario del telefono.');
+  const btn = h('button', { class: 'b secondario', onclick: async () => {
+    btn.disabled = true;
+    try {
+      const r = await api('chiaveCalendario');
+      const https = URL_APP + '?cal=' + encodeURIComponent(r.chiave);
+      const webcal = https.replace(/^https:/, 'webcal:');
+      box.replaceChildren(
+        h('div', { class: 'titolo' }, 'Aggiungi il calendario'),
+        spiega,
+        h('div', { class: 'azioni' }, [
+          h('a', { class: 'b', href: 'https://calendar.google.com/calendar/r?cid=' + encodeURIComponent(webcal), target: '_blank', rel: 'noopener' }, 'Google Calendar'),
+          h('a', { class: 'b secondario', href: webcal }, 'iPhone'),
+          h('button', { class: 'b secondario', onclick: () => copiaTesto(https, box) }, 'Copia il link')
+        ]),
+        h('p', { class: 'muto piccolo' }, 'Il link è personale: non condividerlo. Il calendario si aggiorna da solo, ma con qualche ora di ritardo (Google anche un giorno): per i cambi dell\'ultimo minuto guarda l\'app.')
+      );
+    } catch (e) { box.appendChild(errore(e)); btn.disabled = false; }
+  } }, 'Mettilo nel calendario del telefono');
+  box.append(h('div', { class: 'titolo' }, 'Calendario sul telefono'), spiega, h('div', { class: 'azioni' }, btn));
+  return box;
+}
+
 function disegnaIoAdulto(d) {
   const box = h('div', {}, [h('h2', { style: 'margin-top:4px' }, d.utente.nomeVis), h('p', { class: 'muto' }, 'Adulto')]);
   box.appendChild(h('h2', {}, 'I miei turni'));
@@ -961,6 +1073,7 @@ function disegnaIoAdulto(d) {
     h('div', { class: 'sotto' }, 'Di turno in oratorio')]))));
   box.appendChild(h('h2', {}, 'Merenda e acquisti'));
   box.appendChild(bloccoMerenda(d.merenda));
+  box.appendChild(bloccoCalendarioTelefono());
   box.appendChild(h('h2', {}, 'Notifiche'));
   box.appendChild(h('p', { class: 'piccolo muto', style: 'margin-top:-6px' }, 'Ricevi gli eventi della parrocchia, il promemoria dei sabati in cui sei di turno e le richieste di acquisto degli altri adulti.'));
   const areaNotifiche = h('div');
@@ -1010,9 +1123,9 @@ function cartaSanto(c, grande) {
     h('div', { class: 'carta-img' }, immagineCarta(c)),
     h('div', { class: 'carta-nome' }, c.nome),
     grande ? h('div', { class: 'carta-desc' }, c.descrizione) : null,
-    grande && (c.sabato || c.fonte) ? h('div', { class: 'carta-fonte' }, [
-      c.sabato ? 'Trovata sabato ' + c.sabato : '',
-      c.sabato && c.fonte ? ' · ' : '',
+    grande && (c.sabato || c.conPunti || c.fonte) ? h('div', { class: 'carta-fonte' }, [
+      c.sabato ? 'Trovata sabato ' + c.sabato : c.conPunti ? 'Guadagnata con i punti' : '',
+      (c.sabato || c.conPunti) && c.fonte ? ' · ' : '',
       c.fonte ? h('a', { href: c.fonte, target: '_blank', rel: 'noopener' }, 'immagine da Wikipedia') : null
     ]) : null
   ]);
@@ -1031,14 +1144,17 @@ function mostraCarteNuove(riep) {
   if (!riep || !riep.nuove || !riep.nuove.length) return;
   let viste = [];
   try { viste = JSON.parse(localStorage.getItem('oc_carte_viste_' + S.utente.id) || '[]'); } catch (e) { viste = []; }
-  const nuove = riep.nuove.filter(c => viste.indexOf(c.numero) < 0);
+  // ogni carta ha una chiave (sabato o punti + numero): se l'appello la toglie e poi torna, la si rivede
+  const chiaveDi = c => c.chiave || c.numero;
+  const nuove = riep.nuove.filter(c => viste.indexOf(chiaveDi(c)) < 0);
   if (!nuove.length) return;
-  try { localStorage.setItem('oc_carte_viste_' + S.utente.id, JSON.stringify(viste.concat(nuove.map(c => c.numero)))); } catch (e) { /* niente */ }
+  try { localStorage.setItem('oc_carte_viste_' + S.utente.id, JSON.stringify(viste.concat(nuove.map(chiaveDi)).slice(-200))); } catch (e) { /* niente */ }
   svuotaCacheTelefono(['collezione']);
   const giro = h('div', { class: 'rivela' }, [
     h('div', { class: 'rivela-titolo' }, nuove.length === 1 ? 'Hai trovato una nuova carta!' : 'Hai trovato ' + nuove.length + ' nuove carte!'),
     h('div', { class: 'rivela-carte' }, nuove.map(c => h('div', { class: 'gira' }, [h('div', { class: 'retro' }), cartaSanto(c, true)]))),
-    h('div', { class: 'piccolo muto', style: 'text-align:center;margin-top:8px' }, 'Grazie per essere venuto all\'oratorio!')
+    h('div', { class: 'piccolo muto', style: 'text-align:center;margin-top:8px' },
+      nuove.every(c => c.conPunti) ? 'Te la sei guadagnata con i punti degli eventi!' : 'Grazie per essere venuto all\'oratorio!')
   ]);
   const chiudi = finestra(giro, 'velo-carte');
   if (riep.trofeoNuovo || riep.completa) {
@@ -1078,7 +1194,14 @@ function disegnaCollezione(d) {
     d.completa ? h('button', { class: 'trofeo-mini', onclick: mostraTrofeo }, [h('span', { html: ICONA_TROFEO }), h('b', {}, 'Collezionista di Santi')]) : null,
     h('div', { class: 'progresso' }, [h('div', { class: 'progresso-barra' }, h('i', { style: 'width:' + pct + '%' })),
       h('div', { class: 'piccolo' }, [h('b', {}, d.trovate + ' di ' + d.totale), ' carte trovate'])]),
-    h('p', { class: 'piccolo muto' }, 'Ogni sabato in cui dici "Ci sono" trovi una carta che non hai ancora: si sblocca il giorno stesso. Trovale tutte per diventare Collezionista di Santi.'),
+    d.puntiPerCarta ? h('div', { class: 'punti-box' }, [
+      h('b', {}, String(d.punti || 0)),
+      h('div', { class: 'piccolo' }, [h('div', { style: 'font-weight:700' }, 'punti degli eventi'),
+        h('div', { class: 'muto' }, d.completa ? 'La collezione è completa.' : 'Ne mancano ' + d.puntiMancanti + ' per la prossima carta')])
+    ]) : null,
+    h('p', { class: 'piccolo muto' }, 'Ogni sabato in cui ci sei trovi una carta che non hai ancora: si sblocca il giorno stesso, dicendo "Ci sono". ' +
+      'Se all\'appello risulti assente, la carta di quel sabato si perde. Agli eventi per animatori ogni presenza confermata vale ' + (d.puntiPerEvento || 20) +
+      ' punti, e ogni ' + (d.puntiPerCarta || 100) + ' punti arriva una carta in più. Trovale tutte per diventare Collezionista di Santi.'),
     griglia
   ]));
 }
@@ -1089,7 +1212,7 @@ function bloccoCollezioneIo(c) {
     h('div', { class: 'mazzetto' }, [h('i'), h('i'), h('i')]),
     h('div', { style: 'flex:1;text-align:left' }, [
       h('div', { style: 'font-weight:750' }, 'Collezione dei santi'),
-      h('div', { class: 'piccolo muto' }, c.completa ? 'Completa! Sei Collezionista di Santi' : c.trovate + ' di ' + c.totale + ' carte trovate')
+      h('div', { class: 'piccolo muto' }, c.completa ? 'Completa! Sei Collezionista di Santi' : c.trovate + ' di ' + c.totale + ' carte trovate' + (c.punti ? ' · ' + c.punti + ' punti' : ''))
     ]),
     icona('vai', 'vai')
   ]);
@@ -1539,6 +1662,7 @@ function disegnaIo(d) {
     if (d.utente.disponibilita !== 'nessuno') box.appendChild(blocchettoPresenza(d.prossimo.idData, d.presenzaProssimo));
   }
   if (d.collezione) box.appendChild(bloccoCollezioneIo(d.collezione));
+  if (d.utente.disponibilita !== 'nessuno') box.appendChild(bloccoMieiSabati(d.sabatiFuturi));
 
   box.appendChild(h('h2', {}, 'I miei incarichi'));
   const futuri = d.incarichi.filter(i => i.futuro), passati = d.incarichi.filter(i => !i.futuro);
@@ -1551,6 +1675,7 @@ function disegnaIo(d) {
     passati.forEach(i => l2.appendChild(rigaIncarico(i)));
     box.appendChild(h('div', { style: 'margin-top:10px' }, tendina('Incarichi passati', passati.length, l2)));
   }
+  box.appendChild(bloccoMioAnno(d.mioAnno));
 
   if (d.volantini && d.volantini.length) {
     box.appendChild(h('h2', {}, 'I miei volantini'));
@@ -1570,6 +1695,9 @@ function disegnaIo(d) {
   box.appendChild(h('h2', {}, 'Estate'));
   box.appendChild(tendina('Disponibilità estate',
     d.estate.length ? rispostoA + ' di ' + d.estate.length : null, dentro));
+
+  box.appendChild(h('h2', {}, 'Calendario'));
+  box.appendChild(bloccoCalendarioTelefono());
 
   box.appendChild(h('h2', {}, 'Notifiche'));
   const areaNotifiche = h('div');
@@ -1748,6 +1876,7 @@ function rigaEvento(e, oggi, dopoModifica) {
     voce('orologio', 'Orario', e.oraInizio ? (e.oraInizio + (e.oraFine ? ' – ' + e.oraFine : '')) : 'Tutto il giorno'),
     e.luogo ? voce('luogo', 'Luogo', e.luogo) : null,
     e.nota ? voce('nota', 'Note', e.nota, 'nota') : null,
+    e.perAnimatori ? presenzaEvento(e, oggi) : null,
     S.utente.livello >= 3
       ? h('div', { class: 'azioni' },
           h('button', { class: 'b secondario piccolo', onclick: ev => { ev.stopPropagation(); vai('gestione'); setTimeout(() => schermataGestione('eventi', e.id), 0); } }, 'Modifica'))
@@ -1777,7 +1906,8 @@ function rigaEvento(e, oggi, dopoModifica) {
     h('div', { class: 'corpo' }, [
       h('div', { class: 'primaria' }, [
         e.titolo,
-        e.categoria ? h('span', { class: 'etichetta viola' }, e.categoria) : null
+        e.categoria ? h('span', { class: 'etichetta viola' }, e.categoria) : null,
+        e.perAnimatori ? h('span', { class: 'etichetta' }, 'animatori') : null
       ]),
       h('div', { class: 'secondaria' }, orario + durata + (e.luogo ? ' · ' + e.luogo : '') +
         (((S.volEventi || {})[e.id] || []).length ? ' · volantino' : ''))
@@ -1789,6 +1919,33 @@ function rigaEvento(e, oggi, dopoModifica) {
 }
 
 const GIORNI_BREVI = ['dom', 'lun', 'mar', 'mer', 'gio', 'ven', 'sab'];
+
+/** Dentro il dettaglio di un evento per animatori: "Ci sono" / "Non ci sono" e chi viene. */
+function presenzaEvento(e, oggi) {
+  const p = (S.presEventi || {})[e.id] || { mia: 'nessuna', verificata: '', quanti: 0, nomi: [] };
+  const box = h('div', { class: 'voce', onclick: ev => ev.stopPropagation() });
+  const conta = h('div', { class: 'piccolo muto', style: 'margin-top:6px' });
+  const scrivi = () => conta.replaceChildren(p.quanti ? (p.quanti === 1 ? '1 animatore ha detto che c\'è' : p.quanti + ' animatori hanno detto che ci sono') +
+    (p.nomi && p.nomi.length ? ': ' + p.nomi.join(', ') : '') : 'Ancora nessuno ha detto che c\'è.');
+  scrivi();
+  let scelta = null;
+  if (!S.utente.adulto) {
+    if (p.verificata === 'Presente') scelta = h('div', { class: 'etichetta verde' }, 'presenza confermata · +20 punti');
+    else if (p.verificata === 'Assente') scelta = h('div', { class: 'etichetta rossa' }, 'all\'appello risulti assente');
+    else if (e.idDataFine >= oggi) scelta = sceltaDue(p.mia, ['Ci sono', 'Non ci sono'], ['presente', 'assente'], async v => {
+      await api('salvaPresenzaEvento', { idEvento: e.id, stato: v === 'presente' });
+      if (v === 'presente' && p.mia !== 'presente') p.quanti++;
+      if (v !== 'presente' && p.mia === 'presente') p.quanti--;
+      p.mia = v; scrivi();
+      svuotaCacheTelefono(['eventi']);
+      toast(v === 'presente' ? 'Presenza segnata' : 'Assenza registrata');
+    });
+  }
+  box.append(h('span', { class: 'ico' }, icona('io')), h('div', { class: 'testo' }, [
+    h('small', {}, 'Per gli animatori'),
+    scelta, conta]));
+  return box;
+}
 
 async function schermataCalendario() {
   segnaNav('calendario');
@@ -1802,6 +1959,7 @@ async function schermataCalendario() {
 function disegnaAnno(c, risposta) {
   const ev = risposta.eventi;
   S.volEventi = risposta.volantini || {};
+  S.presEventi = risposta.presenze || {};
   if (!c.sabati.length) { mostra(vuoto('Calendario vuoto.')); return; }
 
   const oggi = oggiId();
@@ -1877,7 +2035,30 @@ async function schermataGiochi() {
   const fClass = select([{ v: '', t: 'Tutte le classificazioni' }].concat(unici('classificazione')), '');
   const fDurata = select([{ v: '', t: 'Tutte le durate' }].concat(unici('durata')), '');
   const fLuogo = select([{ v: '', t: 'Tutti i luoghi' }].concat(unici('luogo')), '');
+  const ordina = select([
+    { v: 'nome', t: 'Ordina per nome' },
+    { v: 'meno', t: 'Meno giocati quest\'anno' },
+    { v: 'tempo', t: 'Giocati da più tempo' },
+    { v: 'durata', t: 'Per durata' },
+    { v: 'nuovi', t: 'Aggiunti di recente' }
+  ], S.ordineGiochi || 'nome');
   const lista = h('div', { class: 'lista' });
+  const numeroId = g => parseInt(String(g.id).replace(/\D/g, ''), 10) || 0;
+  const minuti = t => { const m = String(t || '').match(/\d+/); return m ? +m[0] + (/più di/i.test(t) ? 1 : 0) : 999; };
+  const confronto = {
+    nome: (a, b) => a.nome.localeCompare(b.nome, 'it'),
+    meno: (a, b) => (a.volteAnno || 0) - (b.volteAnno || 0) || (a.volte || 0) - (b.volte || 0) || a.nome.localeCompare(b.nome, 'it'),
+    tempo: (a, b) => (a.ultimoAnno || '').localeCompare(b.ultimoAnno || '') || (a.volteAnno || 0) - (b.volteAnno || 0) || a.nome.localeCompare(b.nome, 'it'),
+    durata: (a, b) => minuti(a.durata) - minuti(b.durata) || a.nome.localeCompare(b.nome, 'it'),
+    nuovi: (a, b) => numeroId(b) - numeroId(a)
+  };
+  const quanteVolte = g => {
+    if (g.volteAnno === undefined) return '';
+    const ultima = g.ultimoAnno ? ', l\'ultima il ' + dataDaId(g.ultimoAnno).getDate() + ' ' + MESI[dataDaId(g.ultimoAnno).getMonth()].slice(0, 3) : '';
+    const prima = g.volte ? ' (' + g.volte + ' negli anni scorsi)' : '';
+    return g.volteAnno ? 'Giocato ' + (g.volteAnno === 1 ? '1 volta' : g.volteAnno + ' volte') + ' quest\'anno' + ultima + prima
+      : 'Mai giocato quest\'anno' + prima;
+  };
 
   function filtra() {
     const q = cerca.value.trim().toLowerCase();
@@ -1885,13 +2066,16 @@ async function schermataGiochi() {
       (!q || g.nome.toLowerCase().includes(q) || g.materiale.toLowerCase().includes(q)) &&
       (!fTipo.value || g.tipo === fTipo.value) && (!fClass.value || g.classificazione === fClass.value) &&
       (!fDurata.value || g.durata === fDurata.value) && (!fLuogo.value || g.luogo === fLuogo.value));
+    S.ordineGiochi = ordina.value;
+    res.sort(confronto[ordina.value] || confronto.nome);
     lista.replaceChildren(...res.map(g => h('div', { class: 'riga cliccabile', onclick: () => apriGioco(g.id) }, [
       h('div', { class: 'titolo' }, g.nome),
-      h('div', { class: 'sotto' }, [g.tipo, g.classificazione, g.durata, g.luogo].filter(Boolean).join(' · '))
+      h('div', { class: 'sotto' }, [g.tipo, g.classificazione, g.durata, g.luogo].filter(Boolean).join(' · ')),
+      quanteVolte(g) ? h('div', { class: 'anno-riga' }, quanteVolte(g)) : null
     ])));
     if (!res.length) lista.replaceChildren(vuoto('Nessun gioco corrisponde.'));
   }
-  [cerca, fTipo, fClass, fDurata, fLuogo].forEach(el => el.addEventListener('input', filtra));
+  [cerca, fTipo, fClass, fDurata, fLuogo, ordina].forEach(el => el.addEventListener('input', filtra));
   filtra();
   const area = h('div');
   mostra(h('div', {}, [
@@ -1901,6 +2085,7 @@ async function schermataGiochi() {
     ]),
     area, cerca,
     h('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px' }, [fTipo, fClass, fDurata, fLuogo]),
+    h('div', { style: 'margin-top:8px' }, ordina),
     h('div', { style: 'height:10px' }), lista
   ]));
 }
@@ -2418,8 +2603,8 @@ function vistaSabatiIncarichi(area, d, ricarica) {
       p.nomeVis, p.ruolo === 'Responsabile' ? h('small', {}, ' resp.') : null,
       p.problema ? h('small', { class: 'motivo' }, ' · ' + p.problema) : null
     ]);
-    chip.disabled = !s.futuro;   // i sabati passati sono solo storico
-    if (s.futuro) chip.onclick = async () => {
+    chip.disabled = !s.futuro || v.squadra;   // i sabati passati sono storico; le squadre si cambiano in Squadre
+    if (s.futuro && !v.squadra) chip.onclick = async () => {
       const box = h('div', { class: 'sostituisci' }, h('span', { class: 'muto piccolo' }, 'Cerco i sostituti…'));
       chip.after(box); chip.disabled = true;
       try {
@@ -2451,12 +2636,13 @@ function vistaSabatiIncarichi(area, d, ricarica) {
     elenco.replaceChildren(...sabati.map(s => h('div', { class: 'modulo inc-sabato' + (s.futuro ? '' : ' passato') }, [
       h('div', { class: 'ria-testa' }, ['Sabato ' + s.breve, s.evento ? h('span', { class: 'etichetta viola' }, s.evento) : null]),
       ...s.voci.filter(v => !soloBuchi || v.senzaResponsabile || v.persone.some(p => p.problema)).map(v => h('div', { class: 'inc-voce' }, [
-        h('div', { class: 'inc-att' }, [v.attivita, v.senzaResponsabile && s.futuro ? h('span', { class: 'etichetta rossa' }, 'senza responsabile') : null]),
+        h('div', { class: 'inc-att' }, [v.attivita, v.squadra && s.futuro ? h('span', { class: 'etichetta' }, 'squadra') : null,
+          v.senzaResponsabile && s.futuro ? h('span', { class: 'etichetta rossa' }, 'senza responsabile') : null]),
         h('div', { class: 'inc-persone' }, v.persone.length ? v.persone.map(p => persona(v, p, s)) : h('span', { class: 'muto piccolo' }, 'nessuno'))
       ]))
     ])));
   }
-  area.replaceChildren(h('p', { class: 'muto piccolo', style: 'margin-top:0' }, 'Tocca un nome per sostituirlo: il primo della lista è il più adatto. Per aggiungere persone usa la scheda Programma.'), filtri, elenco);
+  area.replaceChildren(h('p', { class: 'muto piccolo', style: 'margin-top:0' }, 'Giochi e attività (etichetta "squadra") li fa la loro squadra: si cambiano nella scheda Squadre e valgono per tutti i sabati. Qui sostituisci con un tocco chi è in preghiera, serate ed eventi.'), filtri, elenco);
   disegna();
 }
 
@@ -2484,7 +2670,10 @@ function vistaAnimatoriIncarichi(area, d, ricarica) {
           h('b', {}, daFare + ' in programma'), ' · ' + a.fatti + ' già fatti',
           parti.length ? ' · ' + parti.join(', ') : '',
           a.prossimoBreve ? ' · prossimo ' + a.prossimoBreve : ''
-        ])
+        ]),
+        a.anno ? h('div', { class: 'inc-anim-sotto' }, 'Presente ' + a.anno.presenze + ' sabati su ' + a.anno.sabati + ' (' + a.anno.percentuale + '%)' +
+          (a.anno.verificati ? ', ' + a.anno.verificati + ' confermati all\'appello' : '') +
+          ' · ' + a.anno.eventi + (a.anno.eventi === 1 ? ' evento' : ' eventi') + ' · ' + a.anno.punti + ' punti · ' + a.anno.carte + '/' + a.anno.totaleCarte + ' carte') : null
       ]),
       dett
     ]);
@@ -2510,7 +2699,7 @@ function vistaAnimatoriIncarichi(area, d, ricarica) {
   const sel = select([{ v: 'piu', t: 'Prima chi ne ha di più' }, { v: 'meno', t: 'Prima chi ne ha meno' }, { v: 'nome', t: 'In ordine di nome' }], ordine);
   sel.onchange = () => { ordine = sel.value; disegna(); };
   const pannello = h('div');
-  const apri = h('button', { class: 'b largo', onclick: () => { apri.classList.add('nascosto'); pannelloRibilancia(pannello, d, ricarica, () => apri.classList.remove('nascosto')); } }, 'Ridistribuisci in modo equilibrato');
+  const apri = h('button', { class: 'b largo', onclick: () => { apri.classList.add('nascosto'); pannelloRibilancia(pannello, d, ricarica, () => apri.classList.remove('nascosto')); } }, 'Ridistribuisci le preghiere');
   area.replaceChildren(
     h('p', { class: 'muto piccolo', style: 'margin-top:0' }, 'Il numero è il totale dell\'anno senza le serate: fatti più in programma. Tocca un nome per vedere quando e cosa.'),
     apri, pannello, sel, elenco);
@@ -2519,14 +2708,10 @@ function vistaAnimatoriIncarichi(area, d, ricarica) {
 
 /** Opzioni, proposta e conferma della ridistribuzione. */
 function pannelloRibilancia(box, d, ricarica, chiudi) {
-  const cat = [['Gioco', 'Giochi'], ['Attività', 'Attività 1-6'], ['Preghiera', 'Preghiere']].map(c => {
-    const x = h('input', { type: 'checkbox' }); x.checked = true; return { v: c[0], x, el: h('label', { style: 'margin:4px 0' }, [x, c[1]]) };
-  });
   const tieni = h('input', { type: 'checkbox' }); tieni.checked = true;
   const risultato = h('div');
   const calcola = h('button', { class: 'b', onclick: async () => {
-    const categorie = cat.filter(c => c.x.checked).map(c => c.v);
-    if (!categorie.length) { risultato.replaceChildren(errore('Scegli almeno una categoria.')); return; }
+    const categorie = ['Preghiera'];
     calcola.disabled = true;
     risultato.replaceChildren(h('p', { class: 'muto piccolo' }, 'Calcolo…'));
     try {
@@ -2586,9 +2771,8 @@ function pannelloRibilancia(box, d, ricarica, chiudi) {
   }
 
   box.replaceChildren(h('div', { class: 'modulo' }, [
-    h('div', { class: 'ria-testa' }, 'Ridistribuzione equilibrata'),
-    h('p', { class: 'piccolo muto', style: 'margin:0 0 6px' }, 'Sposta incarichi futuri da chi ne ha di più a chi ne ha di meno, contando tutto l\'anno. Le serate e chi non è disponibile restano fuori. Rispetta le regole della preghiera, le assenze dichiarate e non mette nessuno due volte nella stessa cosa lo stesso sabato.'),
-    h('label', {}, 'Cosa ridistribuire'), ...cat.map(c => c.el),
+    h('div', { class: 'ria-testa' }, 'Ridistribuzione delle preghiere'),
+    h('p', { class: 'piccolo muto', style: 'margin:0 0 6px' }, 'Sposta le preghiere future da chi ha più incarichi a chi ne ha meno, contando tutto l\'anno, turni di squadra compresi: chi è in tante squadre prega un po\' meno. Giochi e attività restano alle loro squadre. Rispetta le regole della preghiera e le assenze dichiarate.'),
     h('label', { style: 'margin-top:10px' }, [tieni, 'Lascia i responsabili dove sono']),
     h('div', { class: 'azioni' }, [calcola, h('button', { class: 'b secondario', onclick: () => { box.replaceChildren(); chiudi(); } }, 'Chiudi')]),
     risultato
@@ -2598,7 +2782,7 @@ function pannelloRibilancia(box, d, ricarica, chiudi) {
 async function schermataGestione(scheda, apri) {
   scheda = scheda || 'programma';
   const tab = h('div', { class: 'schede' }, [
-    ['programma', 'Programma'], ['incarichi', 'Incarichi'], ['promemoria', 'Promemoria'], ['volantini', 'Volantini'], ['eventi', 'Eventi'],
+    ['programma', 'Programma'], ['squadre', 'Squadre'], ['appello', 'Appello'], ['incarichi', 'Incarichi'], ['promemoria', 'Promemoria'], ['volantini', 'Volantini'], ['eventi', 'Eventi'],
     ['estate', 'Estate'], ['contatti', 'Contatti'], ['cruscotto', 'Cruscotto']
   ].map(t => h('button', { class: t[0] === scheda ? 'on' : '', onclick: () => schermataGestione(t[0]) }, t[1])));
   const contenuto = h('div', {}, h('p', { class: 'muto' }, 'Carico…'));
@@ -2609,6 +2793,8 @@ async function schermataGestione(scheda, apri) {
     else if (scheda === 'eventi') await gestioneEventi(contenuto, apri);
     else if (scheda === 'volantini') await gestioneVolantini(contenuto);
     else if (scheda === 'incarichi') await gestioneIncarichi(contenuto);
+    else if (scheda === 'appello') await gestioneAppello(contenuto);
+    else if (scheda === 'squadre') await gestioneSquadre(contenuto);
     else if (scheda === 'estate') await gestioneEstate(contenuto);
     else if (scheda === 'contatti') await gestioneContatti(contenuto);
     else await gestioneCruscotto(contenuto);
@@ -2803,7 +2989,8 @@ async function gestioneEventi(cont, apriId) {
       }, [
         h('div', { class: 'data' }, [h('span', { class: 'n' }, dd.getDate()), h('span', { class: 'g' }, GIORNI_BREVI[dd.getDay()])]),
         h('div', { class: 'corpo' }, [
-          h('div', { class: 'primaria' }, [e.titolo, e.categoria ? h('span', { class: 'etichetta viola' }, e.categoria) : null]),
+          h('div', { class: 'primaria' }, [e.titolo, e.categoria ? h('span', { class: 'etichetta viola' }, e.categoria) : null,
+            e.perAnimatori ? h('span', { class: 'etichetta' }, 'animatori') : null]),
           h('div', { class: 'secondaria' }, (e.oraInizio || 'tutto il giorno') + (e.piuGiorni ? ' · più giorni' : '') + (e.luogo ? ' · ' + e.luogo : ''))
         ]),
         icona('vai', 'vai')
@@ -2826,6 +3013,8 @@ async function gestioneEventi(cont, apriId) {
     const nota = h('textarea', { placeholder: 'Note' }, e.nota);
     const avvisa = h('input', { type: 'checkbox', style: 'width:auto;min-height:0;margin-right:8px' });
     avvisa.checked = !!e.avvisa;
+    const perAnimatori = h('input', { type: 'checkbox', style: 'width:auto;min-height:0;margin-right:8px' });
+    perAnimatori.checked = !!e.perAnimatori;
     const msg = h('div');
 
     const salva = h('button', { class: 'b', onclick: async () => {
@@ -2835,7 +3024,7 @@ async function gestioneEventi(cont, apriId) {
           id: e.id, idData: compatta(inizio.value), idDataFine: compatta(fine.value) || compatta(inizio.value),
           titolo: titolo.value, categoria: categoria.value,
           oraInizio: oraI.value, oraFine: oraF.value, luogo: luogo.value, nota: nota.value,
-          avvisa: avvisa.checked
+          avvisa: avvisa.checked, perAnimatori: perAnimatori.checked
         });
         toast(e.id ? 'Evento aggiornato' : 'Evento aggiunto');
         azzera('calendario');
@@ -2864,6 +3053,8 @@ async function gestioneEventi(cont, apriId) {
       h('p', { class: 'muto piccolo' }, 'Senza orario l\'evento vale per tutta la giornata.'),
       h('label', {}, 'Luogo'), luogo,
       h('label', {}, 'Note'), nota,
+      h('label', {}, [perAnimatori, 'Evento per animatori: si segna la presenza e dà punti']),
+      h('p', { class: 'muto piccolo', style: 'margin-top:2px' }, 'Gli animatori possono dire "Ci sono"; dopo l\'evento fai l\'appello in Gestione → Appello: ogni presenza confermata vale 20 punti.'),
       h('label', {}, [avvisa, 'Avvisa tutti con una notifica']),
       msg,
       h('div', { class: 'azioni' }, [salva, elimina,
@@ -2881,6 +3072,66 @@ async function gestioneEventi(cont, apriId) {
     const e = d.eventi.find(x => x.id === apriId);
     if (e) modulo(e);
   }
+}
+
+/**
+ * Appello: chi c'era davvero a un sabato o a un evento per animatori. Chi ha
+ * detto "Ci sono" è in alto. Assente a un sabato = la carta di quel sabato si
+ * perde; presente senza averlo detto = la carta arriva; presente a un evento = 20 punti.
+ */
+async function gestioneAppello(cont, scelta) {
+  const d = await api('appello', scelta || {});
+  if (!d.occasioni.length) { cont.replaceChildren(vuoto('Non c\'è ancora nessun sabato o evento per animatori di cui fare l\'appello.')); return; }
+  const chiave = o => o.tipo + '|' + o.id;
+  const sel = select(d.occasioni.map(o => ({ v: chiave(o), t: o.testo + (o.fatto ? ' ✓' : '') })), chiave(d.scelta));
+  sel.onchange = () => { const [tipo, id] = sel.value.split('|'); cont.replaceChildren(h('p', { class: 'muto' }, 'Carico…')); gestioneAppello(cont, { tipo, id }).catch(e => cont.replaceChildren(errore(e))); };
+  const evento = d.scelta.tipo === 'evento';
+  const valori = {};
+  d.persone.forEach(p => { valori[p.id] = p.verifica; });
+  const contatore = h('div', { class: 'piccolo muto' });
+  const conta = () => {
+    const pres = Object.values(valori).filter(v => v === 'Presente').length;
+    const ass = Object.values(valori).filter(v => v === 'Assente').length;
+    const resto = d.persone.length - pres - ass;
+    contatore.textContent = pres + (pres === 1 ? ' presente · ' : ' presenti · ') + ass + (ass === 1 ? ' assente · ' : ' assenti · ') + resto + ' da segnare';
+  };
+  const DICH = { presente: ['aveva detto: ci sono', 'si'], assente: ['aveva detto: non ci sono', 'no'], nessuna: ['non aveva risposto', ''] };
+  const lista = h('div', { class: 'modulo' });
+  const tuttiDichiarati = h('button', { class: 'b secondario piccolo', onclick: () => {
+    d.persone.forEach(p => { if (p.dichiarato === 'presente' && !valori[p.id]) valori[p.id] = 'Presente'; });
+    gestioneAppelloRidisegna();
+  } }, 'Chi ha detto "Ci sono" era presente');
+  function gestioneAppelloRidisegna() {
+    // si ridisegnano le righe con i valori correnti
+    lista.replaceChildren(...d.persone.map(p => h('div', { class: 'riga-scelta' }, [
+      h('div', { class: 'chi' }, [p.nomeVis, h('small', { class: DICH[p.dichiarato][1] }, DICH[p.dichiarato][0])]),
+      sceltaDue(valori[p.id], ['Presente', 'Assente'], ['Presente', 'Assente', ''], async v => { valori[p.id] = v; conta(); })
+    ])));
+    conta();
+  }
+  const esito = h('div');
+  const salva = h('button', { class: 'b largo', onclick: async () => {
+    const voci = d.persone.filter(p => valori[p.id] !== p.verifica).map(p => ({ id: p.id, verifica: valori[p.id] || '' }));
+    if (!voci.length) { toast('Nessuna modifica'); return; }
+    salva.disabled = true;
+    try {
+      const r = await api('salvaAppello', { tipo: d.scelta.tipo, id: d.scelta.id, voci });
+      toast('Appello salvato' + (r.carteTolte ? ' · ' + r.carteTolte + (r.carteTolte === 1 ? ' carta tolta' : ' carte tolte') : ''));
+      svuotaCacheTelefono(['incarichi', 'eventi']);
+      gestioneAppello(cont, { tipo: d.scelta.tipo, id: d.scelta.id });
+    } catch (e) { esito.replaceChildren(errore(e)); salva.disabled = false; }
+  } }, 'Salva l\'appello');
+  gestioneAppelloRidisegna();
+  cont.replaceChildren(
+    h('label', { style: 'margin-top:0' }, 'Sabato o evento'), sel,
+    h('p', { class: 'muto piccolo' }, evento
+      ? 'Ogni presenza confermata vale 20 punti; ogni 100 punti arriva una carta.'
+      : 'Chi risulta assente perde la carta di questo sabato; chi era presente senza averlo detto la riceve alla prossima apertura dell\'app.'),
+    d.verificatoDa.length ? h('p', { class: 'piccolo' }, 'Appello già fatto da ' + d.verificatoDa.join(', ') + '. Puoi correggerlo.') : null,
+    h('div', { class: 'azioni', style: 'margin:6px 0' }, tuttiDichiarati),
+    contatore, lista,
+    h('div', { class: 'barra-conferma' }, [salva, esito])
+  );
 }
 
 function selettoreData(filtro, iniziale, onChange) {
@@ -2948,6 +3199,15 @@ function blocchettoGestioneVoce(v, g) {
   }
 
   function disegnaAssegnazioni() {
+    if (v.diSquadra) {
+      assegn.replaceChildren(
+        h('label', {}, 'La squadra'),
+        h('div', {}, v.persone.length ? testoPersone(v.persone) : h('span', { class: 'muto piccolo' }, 'Squadra vuota.')),
+        h('div', { class: 'azioni' }, [h('button', { class: 'b secondario piccolo', onclick: () => { S.squadraAtt = v.idAtt; schermataGestione('squadre'); } }, 'Cambia la squadra'),
+          h('span', { class: 'muto piccolo', style: 'align-self:center' }, 'vale per tutti i suoi sabati')])
+      );
+      return;
+    }
     const righe = v.persone.map(p => {
       const ruolo = select(g.ruoli, p.ruolo);
       ruolo.style.width = 'auto'; ruolo.style.minHeight = '36px';
@@ -2984,7 +3244,8 @@ function blocchettoGestioneVoce(v, g) {
       h('label', {}, 'Chi se ne occupa'),
       ...righe,
       righe.length ? null : h('p', { class: 'muto piccolo' }, 'Nessuno assegnato.'),
-      h('div', { style: 'display:grid;grid-template-columns:1fr auto auto;gap:6px;margin-top:8px;align-items:center' }, [nuovo, ruoloNuovo, btn])
+      h('div', { style: 'margin-top:8px' }, nuovo),
+      h('div', { style: 'display:grid;grid-template-columns:1fr auto;gap:6px;margin-top:6px;align-items:center' }, [ruoloNuovo, btn])
     );
   }
   disegnaTesta(); disegnaAssegnazioni();
@@ -3084,12 +3345,12 @@ async function gestioneCruscotto(cont) {
 async function schermataAdmin(scheda) {
   scheda = scheda || 'pin';
   const tab = h('div', { class: 'schede' }, [
-    ['pin', 'PIN'], ['notifiche', 'Notifiche'], ['preghiere', 'Preghiere'], ['calendar', 'Google Calendar'], ['controlli', 'Controlli'], ['calendario', 'Calendario'], ['anagrafica', 'Anagrafica'], ['squadre', 'Squadre'], ['archivio', 'Fine anno']
+    ['pin', 'PIN'], ['notifiche', 'Notifiche'], ['preghiere', 'Preghiere'], ['calendar', 'Google Calendar'], ['controlli', 'Controlli'], ['calendario', 'Calendario'], ['anagrafica', 'Anagrafica'], ['riepilogo', 'Riepilogo anno'], ['archivio', 'Fine anno']
   ].map(t => h('button', { class: t[0] === scheda ? 'on' : '', onclick: () => schermataAdmin(t[0]) }, t[1])));
   const cont = h('div', {}, h('p', { class: 'muto' }, 'Carico…'));
   mostra(h('div', {}, [h('h2', { style: 'margin-top:4px' }, 'Amministrazione'), tab, cont]));
   try {
-    await ({ pin: adminPin, notifiche: adminNotifiche, preghiere: adminPreghiere, calendar: adminCalendar, controlli: adminControlli, calendario: adminCalendario, anagrafica: adminAnagrafica, squadre: adminSquadre, archivio: adminArchivio })[scheda](cont);
+    await ({ pin: adminPin, notifiche: adminNotifiche, preghiere: adminPreghiere, calendar: adminCalendar, controlli: adminControlli, calendario: adminCalendario, anagrafica: adminAnagrafica, riepilogo: adminRiepilogo, archivio: adminArchivio })[scheda](cont);
   } catch (e) { cont.replaceChildren(errore(e)); }
 }
 
@@ -3394,61 +3655,122 @@ async function adminAnagrafica(cont) {
   }
 }
 
-async function adminSquadre(cont) {
+/**
+ * Squadre: l'unico posto dove si decide chi fa i giochi a rotazione e le
+ * Attività 1-6. Ogni modifica vale subito per tutti i sabati futuri di quella
+ * squadra. Per preghiera, serate ed eventi la squadra è solo l'elenco di chi
+ * può essere scelto: le persone si mettono sabato per sabato in Programma.
+ */
+async function gestioneSquadre(cont) {
   const d = await api('squadre');
+  if (!d.attivita.length) { cont.replaceChildren(vuoto('Nessuna attività attiva.')); return; }
   const area = h('div');
-  const sel = select(d.attivita.map(a => ({ v: a.id, t: a.nome })), S.squadraAtt || d.attivita[0].id);
+  const GRUPPI = ['Giochi a rotazione', 'Attività', 'Gioco libero (ogni sabato)', 'Per data: solo l\'elenco di chi può farle'];
+  const sel = h('select');
+  GRUPPI.forEach((titolo, g) => {
+    const voci = d.attivita.filter(a => a.gruppo === g);
+    if (!voci.length) return;
+    const og = h('optgroup', { label: titolo });
+    voci.forEach(a => og.appendChild(h('option', { value: a.id }, a.nome)));
+    sel.appendChild(og);
+  });
+  sel.value = d.attivita.some(a => a.id === S.squadraAtt) ? S.squadraAtt : d.attivita[0].id;
   sel.onchange = () => { S.squadraAtt = sel.value; disegna(); };
-  cont.replaceChildren(h('label', {}, 'Attività'), sel, area);
+  cont.replaceChildren(
+    h('p', { class: 'muto piccolo', style: 'margin-top:0' }, 'Giochi e attività li fa sempre la loro squadra: quando cambi qualcuno qui, cambia in tutti i sabati futuri. Sabato per sabato si organizzano solo preghiera, serate ed eventi (in Programma).'),
+    h('label', {}, 'Squadra'), sel, area);
 
   function disegna() {
-    const membri = d.squadre.filter(q => q.idAtt === sel.value).sort((a, b) => (a.ruolo === 'Responsabile' ? 0 : 1) - (b.ruolo === 'Responsabile' ? 0 : 1) || a.nomeVis.localeCompare(b.nomeVis, 'it'));
+    const a = d.attivita.find(x => x.id === sel.value) || {};
+    const membri = d.squadre.filter(q => q.idAtt === sel.value).sort((x, y) => (x.ruolo === 'Responsabile' ? 0 : 1) - (y.ruolo === 'Responsabile' ? 0 : 1) || x.nomeVis.localeCompare(y.nomeVis, 'it'));
+    const info = a.diSquadra
+      ? (a.sabati ? 'Tocca a questa squadra in ' + a.sabati + (a.sabati === 1 ? ' sabato' : ' sabati') + ' da qui a fine anno' + (a.prossimo ? ', il prossimo è il ' + a.prossimo : '') + '.' : 'Per ora nessun sabato in programma per questa squadra.')
+      : a.gruppo === 2 ? 'Vale ogni sabato aperto, sempre con questa squadra.'
+      : 'Questo è solo l\'elenco di chi può farlo: chi lo fa ogni volta si sceglie in Programma.';
     const righe = membri.map(q => {
       const ruolo = select(d.ruoli, q.ruolo); ruolo.style.width = 'auto'; ruolo.style.minHeight = '36px';
       ruolo.onchange = async () => { try { const r = await api('salvaSquadra', { idAtt: q.idAtt, idAnimatore: q.idAnimatore, ruolo: ruolo.value }); q.ruolo = ruolo.value; dopoSquadra(r, 'Ruolo aggiornato'); } catch (e) { toast(e, true); } };
-      return h('div', { style: 'display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--linea)' }, [
-        h('span', { style: 'flex:1' }, q.nomeVis), ruolo,
+      return h('div', { class: 'riga-scelta' }, [
+        h('div', { class: 'chi' }, [q.nomeVis, a.diSquadra && d.inSquadre[q.idAnimatore] > 1 ? h('small', {}, 'in ' + d.inSquadre[q.idAnimatore] + ' squadre') : null]),
+        ruolo,
         h('button', { class: 'b pericolo piccolo', onclick: async () => {
-          if (!confirm('Togliere ' + q.nomeVis + ' dalla squadra?')) return;
-          try { const r = await api('rimuoviSquadra', { idAtt: q.idAtt, idAnimatore: q.idAnimatore }); d.squadre = d.squadre.filter(x => x !== q); disegna(); dopoSquadra(r, 'Tolto'); } catch (e) { toast(e, true); }
+          if (!confirm('Togliere ' + q.nomeVis + ' dalla squadra' + (a.diSquadra ? '? Non avrà più ' + a.nome + ' nei sabati futuri.' : '?'))) return;
+          try {
+            const r = await api('rimuoviSquadra', { idAtt: q.idAtt, idAnimatore: q.idAnimatore });
+            d.squadre = d.squadre.filter(x => x !== q);
+            if (a.diSquadra) d.inSquadre[q.idAnimatore] = Math.max(0, (d.inSquadre[q.idAnimatore] || 1) - 1);
+            disegna(); dopoSquadra(r, 'Tolto');
+          } catch (e) { toast(e, true); }
         } }, 'Togli')
       ]);
     });
-    const catSquadra = ((d.attivita || []).find(x => x.id === sel.value) || {}).categoria;
-    const nuovo = select([{ v: '', t: 'Aggiungi animatore…' }].concat(d.animatori.filter(a => !a.nessunIncarico && (!a.soloSerate || catSquadra === 'Serata')).map(a => ({ v: a.id, t: a.nomeVis }))), '');
+    // chi può entrare: niente "nessun incarico", chi fa solo serate solo nelle serate; prima chi è in meno squadre
+    const dentro = new Set(membri.map(q => q.idAnimatore));
+    const ammessi = d.animatori.filter(x => !dentro.has(x.id) && !x.adulto && !x.nessunIncarico && (!x.soloSerate || a.categoria === 'Serata'))
+      .sort((x, y) => a.diSquadra ? ((d.inSquadre[x.id] || 0) - (d.inSquadre[y.id] || 0) || x.nomeVis.localeCompare(y.nomeVis, 'it')) : x.nomeVis.localeCompare(y.nomeVis, 'it'));
+    const nuovo = select([{ v: '', t: 'Aggiungi animatore…' }].concat(ammessi.map(x => ({
+      v: x.id, t: x.nomeVis + (a.diSquadra ? ' · ' + (d.inSquadre[x.id] ? 'in ' + d.inSquadre[x.id] + (d.inSquadre[x.id] === 1 ? ' squadra' : ' squadre') : 'nessuna squadra') : '') }))), '');
     const ruoloNuovo = select(d.ruoli, d.ruoli[d.ruoli.length - 1]);
     const btn = h('button', { class: 'b piccolo', onclick: async () => {
       if (!nuovo.value) return;
+      btn.disabled = true;
       try {
         const r = await api('salvaSquadra', { idAtt: sel.value, idAnimatore: nuovo.value, ruolo: ruoloNuovo.value });
-        const a = d.animatori.find(x => x.id === nuovo.value);
-        d.squadre = d.squadre.filter(x => !(x.idAtt === sel.value && x.idAnimatore === nuovo.value));
-        d.squadre.push({ idAtt: sel.value, idAnimatore: a.id, nomeVis: a.nomeVis, ruolo: r.ruolo });
+        const x = d.animatori.find(y => y.id === nuovo.value);
+        d.squadre.push({ idAtt: sel.value, idAnimatore: x.id, nomeVis: x.nomeVis, ruolo: r.ruolo });
+        if (a.diSquadra) d.inSquadre[x.id] = (d.inSquadre[x.id] || 0) + 1;
         disegna(); dopoSquadra(r, 'Aggiunto');
-      } catch (e) { toast(e, true); }
+      } catch (e) { toast(e, true); btn.disabled = false; }
     } }, 'Aggiungi');
-    const nomeAtt = ((d.attivita || []).find(x => x.id === sel.value) || {}).nome || '';
-    const allinea = h('button', { class: 'b secondario', onclick: async () => {
-      if (!confirm('Rendere tutti i sabati futuri di "' + nomeAtt + '" uguali a questa squadra?\n\nChi non è nella squadra verrà tolto da quei sabati (anche se ce l\'aveva messo la ridistribuzione), chi manca verrà aggiunto.')) return;
-      allinea.disabled = true;
-      try {
-        const r = await api('allineaSquadra', { idAtt: sel.value });
-        svuotaCacheTelefono(['sabato', 'prossimoSabato', 'avvio', 'io', 'incarichi', 'gestioneSabato']);
-        toast(r.sabati + ' sabati allineati: ' + r.aggiunti + ' aggiunte, ' + r.tolti + ' tolte');
-      } catch (e) { toast(e, true); }
-      allinea.disabled = false;
-    } }, 'Allinea i sabati futuri a questa squadra');
-    area.replaceChildren(...righe, righe.length ? null : vuoto('Nessun membro.'),
-      h('div', { style: 'display:grid;grid-template-columns:1fr auto auto;gap:6px;margin-top:10px;align-items:center' }, [nuovo, ruoloNuovo, btn]),
-      h('p', { class: 'piccolo muto', style: 'margin-top:18px' }, 'Ogni modifica alla squadra vale anche per i sabati già in programma, da oggi in poi. Se i sabati futuri sono stati cambiati a mano e vuoi ripartire dalla squadra, usa il pulsante qui sotto.'),
-      righe.length ? h('div', { class: 'azioni', style: 'margin-top:4px' }, allinea) : null);
+    area.replaceChildren(
+      h('div', { class: 'modulo' }, [
+        h('div', { class: 'ria-testa' }, [a.nome, h('span', { class: 'conta-piccola' }, membri.length + (membri.length === 1 ? ' persona' : ' persone'))]),
+        h('p', { class: 'piccolo muto', style: 'margin:0 0 6px' }, info),
+        ...righe, righe.length ? null : vuoto('Nessuno in squadra.'),
+        h('div', { style: 'margin-top:12px' }, nuovo),
+        h('div', { style: 'display:grid;grid-template-columns:1fr auto;gap:6px;margin-top:6px;align-items:center' }, [ruoloNuovo, btn])
+      ]),
+      a.diSquadra && !membri.some(q => q.ruolo === 'Responsabile') && membri.length ? h('div', { class: 'errore' }, 'Questa squadra non ha un responsabile.') : null
+    );
   }
-  /** Dopo una modifica: avviso con i sabati aggiornati e copie del telefono da rifare. */
+  /** Dopo una modifica: le copie salvate sul telefono vanno rifatte. */
   function dopoSquadra(r, testo) {
-    svuotaCacheTelefono(['sabato', 'prossimoSabato', 'avvio', 'io', 'incarichi', 'gestioneSabato']);
-    toast(testo + (r && r.sabati ? ' · aggiornati ' + r.sabati + ' sabati futuri' : ''));
+    svuotaCacheTelefono(['sabato', 'prossimoSabato', 'avvio', 'io', 'incarichi', 'gestioneSabato', 'squadre']);
+    toast(testo + (r && r.sabati ? ' · vale per ' + r.sabati + ' sabati futuri' : ''));
   }
   disegna();
+}
+
+/** Riepilogo dell'anno, da leggere o stampare (anche come PDF). */
+async function adminRiepilogo(cont) {
+  const r = await api('riepilogoAnno');
+  const n = (num, testo) => h('div', { class: 'numero' }, [h('b', {}, String(num)), h('span', {}, testo)]);
+  const tabella = righe => h('table', { class: 'tabella-semplice' }, h('tbody', {}, righe.map(x => h('tr', {}, [h('td', {}, x[0]), h('td', {}, String(x[1]))]))));
+  const sezione = (titolo, corpo) => h('div', { class: 'modulo' }, [h('div', { class: 'titolo' }, titolo), corpo]);
+  cont.replaceChildren(
+    h('div', { class: 'azioni no-stampa', style: 'margin-top:0' }, h('button', { class: 'b', onclick: () => window.print() }, 'Stampa o salva PDF')),
+    h('h2', {}, 'Oratorio Don Bosco Sangano' + (r.anno ? ' · ' + r.anno : '')),
+    h('p', { class: 'muto piccolo' }, 'Situazione al ' + r.oggi + '.'),
+    h('div', { class: 'numeri' }, [
+      n(r.sabati.fatti + '/' + r.sabati.aperti, 'sabati fatti'),
+      n(r.sabati.rimanenti, 'ancora da fare'),
+      n(r.mediaPresenti, 'animatori presenti in media'),
+      n(r.animatori, 'animatori attivi'),
+      n(r.incarichi.totale, 'incarichi svolti'),
+      n(r.eventi.length, 'eventi per animatori')
+    ]),
+    sezione('Presenze ai sabati', h('div', {}, [
+      h('p', { class: 'muto piccolo', style: 'margin:0 0 6px' }, 'Contano l\'appello dove è stato fatto (' + r.sabati.conAppello + ' sabati), altrimenti il "Ci sono".'),
+      tabella(r.perSabato.map(x => [x.breve + (x.appello ? ' ✓' : ''), x.n]))])),
+    sezione('I più presenti', r.piuPresenti.length ? tabella(r.piuPresenti.map(x => [x.nomeVis + (x.eventi ? ' · ' + x.eventi + ' eventi' : ''), x.presenze])) : vuoto('Ancora nessuna presenza.')),
+    sezione('Incarichi svolti per tipo', r.incarichi.perCategoria.length ? tabella(r.incarichi.perCategoria.map(x => [x.categoria, x.n])) : vuoto('Nessuno.')),
+    sezione('Giochi più giocati', r.giochi.length ? tabella(r.giochi.map(x => [x.nome, x.volte])) : vuoto('Nessuno.')),
+    sezione('Eventi per animatori', r.eventi.length ? tabella(r.eventi.map(x => [x.breve + ' · ' + x.titolo + ' (detto: ' + x.dichiarati + ')', x.verificati])) : vuoto('Nessuno finora.')),
+    sezione('Collezione dei santi', h('div', {}, [
+      h('p', { style: 'margin:0' }, r.collezione.conCarte + ' animatori hanno almeno una carta, in media ' + r.collezione.media + ' su ' + r.collezione.totale + '.'),
+      h('p', { style: 'margin:6px 0 0' }, r.collezione.completate.length ? 'Collezionisti di Santi: ' + r.collezione.completate.join(', ') + '.' : 'Nessuno ha ancora completato la collezione.')])),
+    sezione('Volantini', h('p', { style: 'margin:0' }, r.volantini.pubblicati + ' pubblicati su ' + r.volantini.totale + ' preparati.'))
+  );
 }
 
 async function adminArchivio(cont) {
