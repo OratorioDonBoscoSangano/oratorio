@@ -573,6 +573,33 @@
   .tabella-semplice td:last-child { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
   .punti-box { display: flex; align-items: center; gap: 12px; background: var(--blu-tenue); border-radius: var(--raggio-s); padding: 12px 14px; margin: 10px 0; }
   .punti-box b { font-size: 1.3rem; color: var(--blu-scuro); }
+  /* presenze dei prossimi sabati */
+  .griglia-pres { overflow-x: auto; border: 1px solid var(--linea); border-radius: var(--raggio-s); background: var(--superficie); box-shadow: var(--ombra); -webkit-overflow-scrolling: touch; }
+  .griglia-pres table { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; font-size: .88rem; margin: 0; }
+  .griglia-pres th, .griglia-pres td { padding: 7px 6px; text-align: center; border: 0; border-bottom: 1px solid var(--linea); background: var(--superficie); }
+  .griglia-pres th:first-child, .griglia-pres td:first-child { position: sticky; left: 0; z-index: 1; text-align: left; padding-left: 12px;
+    max-width: 132px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-shadow: 1px 0 0 var(--linea); font-weight: 650; }
+  .griglia-pres thead th { vertical-align: bottom; font-size: .78rem; color: var(--muto); font-weight: 650; min-width: 56px; }
+  .griglia-pres thead th b { display: block; color: var(--testo); font-size: .86rem; }
+  .griglia-pres thead th .conti { display: block; font-variant-numeric: tabular-nums; line-height: 1.35; margin-top: 3px; }
+  .griglia-pres tr:last-child td { border-bottom: 0; }
+  .pres { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; font-weight: 800; }
+  .pres.si { color: #19703F; background: #E3F5EA; }
+  .pres.no { color: var(--rosso); background: var(--rosso-tenue); }
+  .pres.nd { color: #A9B0BE; }
+  .pres.inc { box-shadow: inset 0 0 0 2px var(--blu-vivo); }
+  .pres.no.inc { box-shadow: inset 0 0 0 2px var(--rosso); }
+  .pres.conf.si { background: #19A35B; color: #fff; }
+  .pres.conf.no { background: var(--rosso); color: #fff; }
+  .pres.conf.inc { box-shadow: inset 0 0 0 2px #fff, 0 0 0 2px var(--blu-vivo); }
+  .pres { position: relative; }
+  .pres.diverso::after { content: '!'; position: absolute; top: -5px; right: -6px; width: 14px; height: 14px; border-radius: 50%;
+    background: var(--ambra); color: #111; font-size: .62rem; font-weight: 800; display: grid; place-items: center; line-height: 1; }
+  .griglia-pres thead th.passato { background: var(--fondo); }
+  .griglia-pres td.passato { background: #FAFBFD; }
+  .legenda-pres { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: .8rem; color: var(--muto); margin: 10px 0 4px; align-items: center; }
+  .legenda-pres .pres { width: 22px; height: 22px; font-size: .8rem; margin-right: 4px; vertical-align: middle; }
+
   @media print {
     #nav, #barra, .schede, .no-stampa, #toast, #attesa { display: none !important; }
     body { background: #fff; }
@@ -599,7 +626,7 @@
    ===================================================================== */
 // Cambia a ogni modifica dell'interfaccia: compare in fondo alla scheda "Io",
 // così si capisce subito se il telefono sta eseguendo la versione aggiornata.
-const VERSIONE_APP = '2026.10.14';
+const VERSIONE_APP = '2026.10.16d';
 
 /* =====================================================================
    CONFIGURAZIONE
@@ -1000,22 +1027,35 @@ function sceltaDue(valore, testi, valori, salva) {
   return h('div', { class: 'scelta-due' }, [si, no]);
 }
 
-/** Tutti i sabati da qui a fine anno: si può dire subito quelli in cui non si sarà. */
+/**
+ * I miei sabati: il prossimo in evidenza, poi i due successivi, poi il resto
+ * dell'anno chiuso in una tendina. Si può dire subito quando non si sarà.
+ */
 function bloccoMieiSabati(lista) {
   if (!lista || !lista.length) return null;
-  const senza = lista.filter(x => x.presenza === 'nessuna').length;
-  const righe = lista.map(x => h('div', { class: 'riga-scelta' }, [
-    h('div', { class: 'chi' }, [x.breve + (x.evento ? ' · ' + x.evento : '') + (x.serata ? ' · serata' : ''),
-      h('small', {}, x.incarichi ? (x.incarichi === 1 ? 'hai un incarico' : 'hai ' + x.incarichi + ' incarichi') : 'nessun incarico per te')]),
+  const riga = (x, primo) => h('div', { class: 'riga-scelta' }, [
+    h('div', { class: 'chi' }, [
+      primo ? h('span', { class: 'etichetta', style: 'margin-right:6px' }, 'prossimo') : null,
+      x.breve + (x.evento ? ' · ' + x.evento : '') + (x.serata ? ' · serata' : ''),
+      h('small', { class: x.presenza === 'nessuna' && primo ? 'no' : '' }, (x.incarichi ? (x.incarichi === 1 ? 'hai un incarico' : 'hai ' + x.incarichi + ' incarichi') : 'nessun incarico per te') +
+        (x.presenza === 'nessuna' && primo ? ' · dicci se ci sei' : ''))]),
     sceltaDue(x.presenza, ['Ci sono', 'No'], ['presente', 'assente'], async v => {
       const r = await api('salvaPresenza', { idData: x.idData, stato: v === 'presente' });
       x.presenza = v;
       svuotaCacheTelefono(['io', 'prossimoSabato', 'sabato', 'avvio']);
+      toast(v === 'presente' ? 'Presenza confermata' : 'Assenza registrata');
       if (r.nuoveCarte && r.nuoveCarte.length) mostraCarteNuove({ nuove: r.nuoveCarte, trofeoNuovo: r.trofeoNuovo });
     })
-  ]));
-  return h('div', { style: 'margin-top:10px' }, tendina('I miei sabati', senza ? senza + ' senza risposta' : 'tutti risposti',
-    h('div', {}, [h('p', { class: 'piccolo muto', style: 'margin:0 0 6px' }, 'Se sai già che un sabato non ci sarai, dillo qui: chi organizza non ti assegna incarichi quel giorno.')].concat(righe))));
+  ]);
+  const vicini = lista.slice(0, 3), dopo = lista.slice(3);
+  const senza = dopo.filter(x => x.presenza === 'nessuna').length;
+  return h('div', {}, [
+    h('h2', {}, 'I miei sabati'),
+    h('div', { class: 'modulo', style: 'padding-top:6px;padding-bottom:6px' }, vicini.map((x, i) => riga(x, i === 0))),
+    dopo.length ? tendina('Il resto dell\'anno', senza ? senza + ' senza risposta' : null,
+      h('div', {}, [h('p', { class: 'piccolo muto', style: 'margin:0 0 6px' }, 'Se sai già che un sabato non ci sarai, dillo qui: quel giorno non ti vengono date preghiere, serate o eventi.')]
+        .concat(dopo.map(x => riga(x, false))))) : null
+  ]);
 }
 
 /** Il mio anno: presenze, eventi, punti, incarichi, carte. */
@@ -1657,12 +1697,8 @@ function disegnaIo(d) {
     h('p', { class: 'muto' }, d.utente.grado)
   ]);
 
-  if (d.prossimo) {
-    box.appendChild(h('p', { class: 'piccolo muto', style: 'margin-top:14px' }, 'Prossimo sabato: ' + d.prossimo.testo));
-    if (d.utente.disponibilita !== 'nessuno') box.appendChild(blocchettoPresenza(d.prossimo.idData, d.presenzaProssimo));
-  }
-  if (d.collezione) box.appendChild(bloccoCollezioneIo(d.collezione));
   if (d.utente.disponibilita !== 'nessuno') box.appendChild(bloccoMieiSabati(d.sabatiFuturi));
+  else if (d.prossimo) box.appendChild(h('p', { class: 'piccolo muto', style: 'margin-top:14px' }, 'Prossimo sabato: ' + d.prossimo.testo));
 
   box.appendChild(h('h2', {}, 'I miei incarichi'));
   const futuri = d.incarichi.filter(i => i.futuro), passati = d.incarichi.filter(i => !i.futuro);
@@ -1675,6 +1711,7 @@ function disegnaIo(d) {
     passati.forEach(i => l2.appendChild(rigaIncarico(i)));
     box.appendChild(h('div', { style: 'margin-top:10px' }, tendina('Incarichi passati', passati.length, l2)));
   }
+  if (d.collezione) box.appendChild(bloccoCollezioneIo(d.collezione));
   box.appendChild(bloccoMioAnno(d.mioAnno));
 
   if (d.volantini && d.volantini.length) {
@@ -1687,21 +1724,19 @@ function disegnaIo(d) {
     box.appendChild(h('div', { class: 'lista' }, d.squadre.map(q => h('div', { class: 'riga' }, [h('span', { class: 'titolo' }, [q.attivita, q.ruolo === 'Responsabile' ? h('span', { class: 'etichetta' }, 'responsabile') : null])]))));
   }
 
-  // Le disponibilità estive stanno chiuse: si aprono solo quando servono.
-  const rispostoA = d.estate.filter(e => e.risposta).length;
-  const dentro = h('div');
-  if (!d.estate.length) dentro.appendChild(vuoto('Nessuna proposta ancora aperta.'));
-  d.estate.forEach(e => dentro.appendChild(rigaEstate(S.utente.id, e, d.rispostePossibili)));
-  box.appendChild(h('h2', {}, 'Estate'));
-  box.appendChild(tendina('Disponibilità estate',
-    d.estate.length ? rispostoA + ' di ' + d.estate.length : null, dentro));
+  // Estate: solo quando ci sono proposte a cui rispondere
+  if (d.estate.length) {
+    const rispostoA = d.estate.filter(e => e.risposta).length;
+    const dentro = h('div');
+    d.estate.forEach(e => dentro.appendChild(rigaEstate(S.utente.id, e, d.rispostePossibili)));
+    box.appendChild(h('h2', {}, 'Estate'));
+    box.appendChild(tendina('Disponibilità estate', rispostoA + ' di ' + d.estate.length, dentro));
+  }
 
-  box.appendChild(h('h2', {}, 'Calendario'));
-  box.appendChild(bloccoCalendarioTelefono());
-
-  box.appendChild(h('h2', {}, 'Notifiche'));
+  // calendario e notifiche si sistemano una volta sola: stanno chiusi
+  box.appendChild(h('h2', {}, 'Telefono'));
   const areaNotifiche = h('div');
-  box.appendChild(areaNotifiche);
+  box.appendChild(tendina('Notifiche e calendario', null, h('div', {}, [areaNotifiche, bloccoCalendarioTelefono()])));
   disegnaNotifiche(areaNotifiche);
 
   box.appendChild(h('div', { class: 'azioni', style: 'margin-top:28px' }, h('button', { class: 'b secondario', onclick: esci }, 'Esci')));
@@ -1816,13 +1851,28 @@ async function disegnaNotifiche(area) {
     } catch (e) { area.appendChild(errore(e)); btn.disabled = false; }
   } }, attive ? 'Disattiva su questo telefono' : 'Attiva le notifiche');
 
+  const esitoProva = h('div');
+  const prova = attive ? h('button', { class: 'b secondario', onclick: async () => {
+    prova.disabled = true;
+    esitoProva.replaceChildren(h('p', { class: 'muto piccolo' }, 'Mando la notifica…'));
+    try {
+      const r = await api('provaNotifica');
+      esitoProva.replaceChildren(h('p', { class: 'piccolo', style: 'margin-bottom:0' }, r.inviate
+        ? 'Google l\'ha accettata' + (r.dispositivi > 1 ? ' (' + r.inviate + ' dispositivi su ' + r.dispositivi + ')' : '') + '. Se fra qualche secondo non compare, il blocco è nelle impostazioni del telefono: notifiche del browser o dell\'app consentite, niente risparmio energetico o "non disturbare".'
+        : r.rimosse ? 'Google ha rifiutato la chiave di questo telefono e l\'ho tolta: premi "Disattiva" e poi riattiva le notifiche.'
+        : 'Google non ha accettato l\'invio. Riprova fra poco; se continua, disattiva e riattiva le notifiche.'));
+      if (r.rimosse) disegnaNotifiche(area);
+    } catch (e) { esitoProva.replaceChildren(errore(e)); }
+    prova.disabled = false;
+  } }, 'Mandami una notifica di prova') : null;
   area.replaceChildren(h('div', { class: 'modulo' }, [
     h('div', { class: 'titolo' }, attive ? 'Attive su questo telefono' : 'Non attive su questo telefono'),
     h('p', { class: 'muto piccolo' }, attive
       ? 'Prima di ogni sabato ricevi il promemoria di quello che ti tocca.'
       : 'Attivandole ricevi prima di ogni sabato il promemoria di quello che ti tocca.'),
     stato.dispositivi > 1 ? h('p', { class: 'muto piccolo' }, 'Le hai attive su ' + stato.dispositivi + ' dispositivi.') : null,
-    h('div', { class: 'azioni' }, btn)
+    h('div', { class: 'azioni' }, [btn, prova]),
+    esitoProva
   ]));
 }
 
@@ -2518,54 +2568,27 @@ function selectCandidati(candidati, proposta, conTogli) {
   return select(opz, proposta || (candidati[0] || {}).id || '');
 }
 
-async function gestioneIncarichi(cont, vista) {
-  const d = await api('incarichi');
-  vista = vista || S.vistaIncarichi || (d.problemi.length ? 'sistemare' : 'sabati');
-  S.vistaIncarichi = vista;
-  const ricarica = v => gestioneIncarichi(cont, v);
-
-  const schede = h('div', { class: 'segmento-piccolo' }, [
-    ['sistemare', 'Da sistemare' + (d.problemi.length ? ' (' + d.problemi.length + ')' : '')],
-    ['sabati', 'Sabati'], ['animatori', 'Animatori']
-  ].map(t => h('button', { class: t[0] === vista ? 'on' : '', onclick: () => ricarica(t[0]) }, t[1])));
-  const area = h('div');
-  cont.replaceChildren(schede, area);
-
-  if (vista === 'sistemare') vistaDaSistemare(area, d, ricarica);
-  else if (vista === 'sabati') vistaSabatiIncarichi(area, d, ricarica);
-  else vistaAnimatoriIncarichi(area, d, ricarica);
-}
-
-/** Tutti gli incarichi futuri da riassegnare, con la proposta già scelta. */
-function vistaDaSistemare(area, d, ricarica) {
-  if (!d.problemi.length) {
-    area.replaceChildren(h('div', { class: 'ok-box' }, 'Tutto a posto: nessun incarico futuro è affidato a chi non può farlo.'));
-    return;
-  }
+/** Gli incarichi futuri affidati a chi non c'è o non può, con il sostituto già proposto. */
+function bloccoDaSistemare(d, ricarica) {
+  if (!d.problemi.length) return null;
   const scelte = [];
   const gruppi = {};
   d.problemi.forEach(p => { (gruppi[p.daNome + '|' + p.motivo] = gruppi[p.daNome + '|' + p.motivo] || []).push(p); });
-
   const blocchi = Object.keys(gruppi).map(k => {
     const lista = gruppi[k];
     const [nome, motivo] = k.split('|');
-    const righe = lista.map(p => {
-      const sel = selectCandidati(p.candidati, p.proposta, true);
-      scelte.push({ p, sel });
-      return h('div', { class: 'ria-riga' + (p.tipo === 'squadra' ? ' squadra' : '') }, [
-        h('div', { class: 'ria-cosa' }, [
-          h('div', { class: 'ria-titolo' }, p.titolo),
-          h('div', { class: 'ria-quando' }, p.quando)
-        ]),
-        sel
-      ]);
-    });
-    return h('div', { class: 'modulo' }, [
-      h('div', { class: 'ria-testa' }, [nome, h('span', { class: 'etichetta ambra' }, motivo), h('span', { class: 'conta-piccola' }, lista.length + (lista.length === 1 ? ' incarico' : ' incarichi'))]),
-      ...righe
+    return h('div', { style: 'margin-top:10px' }, [
+      h('div', { class: 'ria-testa' }, [nome, h('span', { class: 'etichetta ambra' }, motivo)]),
+      ...lista.map(p => {
+        const sel = selectCandidati(p.candidati, p.proposta, true);
+        scelte.push({ p, sel });
+        return h('div', { class: 'ria-riga' }, [
+          h('div', { class: 'ria-cosa' }, [h('div', { class: 'ria-titolo' }, p.titolo), h('div', { class: 'ria-quando' }, p.quando)]),
+          sel
+        ]);
+      })
     ]);
   });
-
   const esito = h('div');
   const conferma = h('button', { class: 'b largo', onclick: async () => {
     const modifiche = scelte.map(({ p, sel }) => ({ tipo: p.tipo, chiave: p.chiave, n: p.n, da: p.da, a: sel.value }));
@@ -2574,39 +2597,40 @@ function vistaDaSistemare(area, d, ricarica) {
     conferma.disabled = true;
     try {
       const r = await api('applicaRiassegnazioni', { modifiche });
-      azzera('animatori');
       toast(r.fatte + ' incarichi riassegnati');
       if (r.saltate.length) alert('Fatto. Alcune erano già cambiate:\n\n' + r.saltate.join('\n'));
-      ricarica('sistemare');
+      svuotaCacheTelefono(['sabato', 'prossimoSabato', 'avvio', 'io']);
+      ricarica('sabati');
     } catch (e) { esito.replaceChildren(errore(e)); conferma.disabled = false; }
   } }, 'Conferma tutte (' + d.problemi.length + ')');
-
-  area.replaceChildren(
-    h('p', { class: 'muto piccolo', style: 'margin-top:0' },
-      'Per ogni incarico ho già scelto il sostituto migliore (★): poco carico, libero quel sabato, del grado giusto. Cambia quelli che non ti convincono, poi conferma. Chi sostituisce qualcuno in una squadra viene proposto anche per i sabati di quella squadra.'),
+  return h('div', { class: 'modulo', style: 'border-color:#F3DCAC' }, [
+    h('div', { class: 'ria-testa' }, ['Da sistemare', h('span', { class: 'conta-piccola' }, d.problemi.length + (d.problemi.length === 1 ? ' incarico' : ' incarichi'))]),
+    h('p', { class: 'piccolo muto', style: 'margin:0' }, 'Chi ha detto che non c\'è o non è più disponibile. Il sostituto proposto è il più adatto (poco carico, libero quel sabato, del grado giusto): cambialo se non ti convince.'),
     ...blocchi,
-    h('div', { class: 'barra-conferma' }, [conferma, esito])
-  );
+    h('div', { class: 'azioni' }, conferma), esito
+  ]);
 }
 
-/** Ogni sabato con voci e persone; sui futuri si può sostituire con un tocco. */
+/** I sabati con preghiera, serate ed eventi: si sostituisce o si aggiunge con un tocco. */
 function vistaSabatiIncarichi(area, d, ricarica) {
-  let passati = !!S.incarichiPassati, soloBuchi = !!S.incarichiBuchi;
+  let passati = !!S.incarichiPassati;
   const elenco = h('div');
-  const filtri = h('div', { class: 'azioni', style: 'margin-top:0' }, [
-    h('label', { style: 'margin:0' }, [(() => { const c = h('input', { type: 'checkbox' }); c.checked = passati; c.onchange = () => { passati = S.incarichiPassati = c.checked; disegna(); }; return c; })(), 'Mostra i passati']),
-    h('label', { style: 'margin:0' }, [(() => { const c = h('input', { type: 'checkbox' }); c.checked = soloBuchi; c.onchange = () => { soloBuchi = S.incarichiBuchi = c.checked; disegna(); }; return c; })(), 'Solo quelli da sistemare'])
-  ]);
+  const filtro = h('label', { style: 'margin:0 0 6px' }, [(() => { const c = h('input', { type: 'checkbox' }); c.checked = passati; c.onchange = () => { passati = S.incarichiPassati = c.checked; disegna(); }; return c; })(), 'Mostra anche i sabati passati']);
+
+  function apriSotto(chip, contenuto) {
+    const box = h('div', { class: 'sostituisci' }, h('span', { class: 'muto piccolo' }, 'Cerco chi è più adatto…'));
+    chip.after(box); chip.disabled = true;
+    const chiudi = () => { box.remove(); chip.disabled = false; };
+    contenuto(box, chiudi);
+  }
 
   function persona(v, p, s) {
     const chip = h('button', { class: 'chip-persona' + (p.problema ? ' problema' : '') }, [
-      p.nomeVis, p.ruolo === 'Responsabile' ? h('small', {}, ' resp.') : null,
+      p.nomeVis, p.ruolo === 'Responsabile' ? h('small', {}, ' resp.') : p.ruolo === 'Recita' ? h('small', {}, ' recita') : null,
       p.problema ? h('small', { class: 'motivo' }, ' · ' + p.problema) : null
     ]);
-    chip.disabled = !s.futuro || v.squadra;   // i sabati passati sono storico; le squadre si cambiano in Squadre
-    if (s.futuro && !v.squadra) chip.onclick = async () => {
-      const box = h('div', { class: 'sostituisci' }, h('span', { class: 'muto piccolo' }, 'Cerco i sostituti…'));
-      chip.after(box); chip.disabled = true;
+    chip.disabled = !s.futuro;
+    if (s.futuro) chip.onclick = () => apriSotto(chip, async (box, chiudi) => {
       try {
         const cand = await api('candidati', { idProg: v.idProg, da: p.idAnimatore });
         const sel = selectCandidati(cand, '', false);
@@ -2614,50 +2638,89 @@ function vistaSabatiIncarichi(area, d, ricarica) {
           h('label', { style: 'margin-top:0' }, 'Al posto di ' + p.nomeVis), sel,
           h('div', { class: 'azioni' }, [
             h('button', { class: 'b piccolo', onclick: async () => {
+              if (!sel.value) return;
               try { await api('applicaRiassegnazioni', { modifiche: [{ tipo: 'assegnazione', chiave: v.idProg, da: p.idAnimatore, a: sel.value }] });
-                toast('Sostituito'); ricarica('sabati'); } catch (e) { toast(String(e), true); }
+                toast('Sostituito'); svuotaCacheTelefono(['sabato', 'prossimoSabato', 'avvio']); ricarica('sabati'); } catch (e) { toast(String(e), true); }
             } }, 'Sostituisci'),
             h('button', { class: 'b pericolo piccolo', onclick: async () => {
               if (!confirm('Togliere ' + p.nomeVis + ' senza sostituirlo?')) return;
               try { await api('applicaRiassegnazioni', { modifiche: [{ tipo: 'assegnazione', chiave: v.idProg, da: p.idAnimatore, a: '' }] });
-                toast('Tolto'); ricarica('sabati'); } catch (e) { toast(String(e), true); }
+                toast('Tolto'); svuotaCacheTelefono(['sabato', 'prossimoSabato', 'avvio']); ricarica('sabati'); } catch (e) { toast(String(e), true); }
             } }, 'Togli'),
-            h('button', { class: 'b secondario piccolo', onclick: () => { box.remove(); chip.disabled = false; } }, 'Annulla')
+            h('button', { class: 'b secondario piccolo', onclick: chiudi }, 'Annulla')
           ]));
       } catch (e) { box.replaceChildren(errore(e)); }
-    };
+    });
+    return chip;
+  }
+
+  function aggiungi(v) {
+    const chip = h('button', { class: 'chip-persona', style: 'border-style:dashed;color:var(--blu-scuro)' }, '+ Aggiungi');
+    chip.onclick = () => apriSotto(chip, async (box, chiudi) => {
+      const ruoli = d.ruoli && d.ruoli.length ? d.ruoli : ['Responsabile', 'Aiuto'];
+      const ruoloIniziale = !v.persone.some(p => p.ruolo === 'Responsabile') && ruoli.includes('Responsabile') ? 'Responsabile' : (ruoli.includes('Aiuto') ? 'Aiuto' : ruoli[0]);
+      const ruolo = select(ruoli, ruoloIniziale);
+      const posto = h('div', {}, h('select', {}, h('option', { value: '' }, 'Cerco…')));
+      let scelta = null;
+      async function carica() {
+        try {
+          const cand = await api('candidati', { idProg: v.idProg, da: '', ruolo: ruolo.value });
+          scelta = selectCandidati(cand, cand[0] ? cand[0].id : '', false);
+          posto.replaceChildren(scelta);
+        } catch (e) { posto.replaceChildren(errore(e)); }
+      }
+      ruolo.onchange = carica;
+      box.replaceChildren(h('label', { style: 'margin-top:0' }, 'Chi aggiungi'), posto, h('label', {}, 'Ruolo'), ruolo,
+        h('div', { class: 'azioni' }, [
+          h('button', { class: 'b piccolo', onclick: async () => {
+            if (!scelta || !scelta.value) return;
+            try { await api('salvaAssegnazione', { idProg: v.idProg, idAnimatore: scelta.value, ruolo: ruolo.value, azione: 'aggiungi' });
+              toast('Aggiunto'); svuotaCacheTelefono(['sabato', 'prossimoSabato', 'avvio']); ricarica('sabati'); } catch (e) { toast(String(e), true); }
+          } }, 'Aggiungi'),
+          h('button', { class: 'b secondario piccolo', onclick: chiudi }, 'Annulla')
+        ]));
+      carica();
+    });
     return chip;
   }
 
   function disegna() {
-    const sabati = d.sabati.filter(s => passati || s.futuro)
-      .filter(s => !soloBuchi || s.voci.some(v => v.senzaResponsabile || v.persone.some(p => p.problema)));
-    if (!sabati.length) { elenco.replaceChildren(vuoto(soloBuchi ? 'Niente da sistemare.' : 'Nessun sabato.')); return; }
+    const sabati = d.sabati.filter(s => (passati || s.futuro) && s.voci.length);
+    if (!sabati.length) { elenco.replaceChildren(vuoto('Nessun sabato con preghiera, serate o eventi.')); return; }
     elenco.replaceChildren(...sabati.map(s => h('div', { class: 'modulo inc-sabato' + (s.futuro ? '' : ' passato') }, [
       h('div', { class: 'ria-testa' }, ['Sabato ' + s.breve, s.evento ? h('span', { class: 'etichetta viola' }, s.evento) : null]),
-      ...s.voci.filter(v => !soloBuchi || v.senzaResponsabile || v.persone.some(p => p.problema)).map(v => h('div', { class: 'inc-voce' }, [
-        h('div', { class: 'inc-att' }, [v.attivita, v.squadra && s.futuro ? h('span', { class: 'etichetta' }, 'squadra') : null,
-          v.senzaResponsabile && s.futuro ? h('span', { class: 'etichetta rossa' }, 'senza responsabile') : null]),
-        h('div', { class: 'inc-persone' }, v.persone.length ? v.persone.map(p => persona(v, p, s)) : h('span', { class: 'muto piccolo' }, 'nessuno'))
+      ...s.voci.map(v => h('div', { class: 'inc-voce' }, [
+        h('div', { class: 'inc-att' }, [v.attivita,
+          s.futuro && !v.persone.length ? h('span', { class: 'etichetta rossa' }, 'manca qualcuno')
+            : v.senzaResponsabile && s.futuro && v.categoria !== 'Serata' ? h('span', { class: 'etichetta rossa' }, 'senza responsabile') : null]),
+        h('div', { class: 'inc-persone' }, [
+          ...v.persone.map(p => persona(v, p, s)),
+          !v.persone.length && !s.futuro ? h('span', { class: 'muto piccolo' }, 'nessuno') : null,
+          s.futuro ? aggiungi(v) : null
+        ])
       ]))
     ])));
   }
-  area.replaceChildren(h('p', { class: 'muto piccolo', style: 'margin-top:0' }, 'Giochi e attività (etichetta "squadra") li fa la loro squadra: si cambiano nella scheda Squadre e valgono per tutti i sabati. Qui sostituisci con un tocco chi è in preghiera, serate ed eventi.'), filtri, elenco);
+  area.replaceChildren(bloccoDaSistemare(d, ricarica),
+    filtro, elenco);
   disegna();
 }
 
-/** Riepilogo per animatore: in programma e fatti, divisi fra disponibili e non. */
+/** Chi ha fatto quante preghiere, serate ed eventi, più le presenze dell'anno. */
 function vistaAnimatoriIncarichi(area, d, ricarica) {
   let ordine = S.ordineIncarichi || 'piu';
   const elenco = h('div');
-  const CAT = [['Gioco', 'gioco', 'giochi'], ['Attività', 'attività', 'attività'], ['Preghiera', 'preghiera', 'preghiere'], ['Serata', 'serata', 'serate']];
-  const carico = a => a.totale - (a.perCategoria.Serata || 0);   // quello che la ridistribuzione pareggia
+  const carico = a => a.preghiere;
   const riga = (a, max) => {
-    const daFare = a.totale - a.fatti;
     const dett = h('div', { class: 'inc-storico nascosto' }, a.storico.length
       ? a.storico.map(s => h('div', { class: s.idData < d.oggi ? 'muto' : '' }, (s.idData < d.oggi ? '✓ ' : '') + s.breve + ' · ' + s.attivita + (s.ruolo === 'Responsabile' ? ' (resp.)' : '')))
-      : h('span', { class: 'muto' }, 'Nessun incarico.'));
-    const parti = CAT.map(c => { const n = a.perCategoria[c[0]]; return n ? n + ' ' + (n === 1 ? c[1] : c[2]) : null; }).filter(Boolean);
+      : h('span', { class: 'muto' }, 'Nessuna preghiera, serata o evento.'));
+    const parti = [
+      a.preghiere ? a.preghiere + (a.preghiere === 1 ? ' preghiera' : ' preghiere') + ' (' + a.preghiereFatte + ' fatte)' : 'nessuna preghiera',
+      a.serate ? a.serate + (a.serate === 1 ? ' serata' : ' serate') : null,
+      a.eventi ? a.eventi + (a.eventi === 1 ? ' evento' : ' eventi') : null,
+      a.prossimoBreve ? 'prossimo ' + a.prossimoBreve : null
+    ].filter(Boolean);
     const nonDisp = a.nessunIncarico || a.soloSerate;
     return h('div', { class: 'inc-anim' + (nonDisp ? ' non-disp' : '') }, [
       h('button', { class: 'inc-anim-testa', onclick: () => dett.classList.toggle('nascosto') }, [
@@ -2666,13 +2729,9 @@ function vistaAnimatoriIncarichi(area, d, ricarica) {
             : a.soloSerate ? h('span', { class: 'etichetta viola' }, 'solo serate') : h('span', { class: 'etichetta' }, a.grado.toLowerCase())]),
         h('div', { class: 'inc-barra' }, h('i', { style: 'width:' + (carico(a) ? Math.max(6, Math.round(carico(a) / max * 100)) : 0) + '%' })),
         h('div', { class: 'inc-anim-num' }, String(carico(a))),
-        h('div', { class: 'inc-anim-sotto' }, [
-          h('b', {}, daFare + ' in programma'), ' · ' + a.fatti + ' già fatti',
-          parti.length ? ' · ' + parti.join(', ') : '',
-          a.prossimoBreve ? ' · prossimo ' + a.prossimoBreve : ''
-        ]),
+        h('div', { class: 'inc-anim-sotto' }, parti.join(' · ')),
+        h('div', { class: 'inc-anim-sotto' }, a.squadre.length ? 'Squadre: ' + a.squadre.join(', ') : 'In nessuna squadra'),
         a.anno ? h('div', { class: 'inc-anim-sotto' }, 'Presente ' + a.anno.presenze + ' sabati su ' + a.anno.sabati + ' (' + a.anno.percentuale + '%)' +
-          (a.anno.verificati ? ', ' + a.anno.verificati + ' confermati all\'appello' : '') +
           ' · ' + a.anno.eventi + (a.anno.eventi === 1 ? ' evento' : ' eventi') + ' · ' + a.anno.punti + ' punti · ' + a.anno.carte + '/' + a.anno.totaleCarte + ' carte') : null
       ]),
       dett
@@ -2680,7 +2739,7 @@ function vistaAnimatoriIncarichi(area, d, ricarica) {
   };
   function disegna() {
     S.ordineIncarichi = ordine;
-    const cmp = ordine === 'meno' ? (a, b) => carico(a) - carico(b) || a.nomeVis.localeCompare(b.nomeVis, 'it')
+    const cmp = ordine === 'meno' ? (a, b) => carico(a) - carico(b) || a.squadre.length - b.squadre.length || a.nomeVis.localeCompare(b.nomeVis, 'it')
       : ordine === 'piu' ? (a, b) => carico(b) - carico(a) || a.nomeVis.localeCompare(b.nomeVis, 'it')
       : (a, b) => a.nomeVis.localeCompare(b.nomeVis, 'it');
     const disp = d.animatori.filter(a => !a.nessunIncarico && !a.soloSerate).sort(cmp);
@@ -2689,19 +2748,18 @@ function vistaAnimatoriIncarichi(area, d, ricarica) {
     const valori = disp.map(carico);
     elenco.replaceChildren(
       h('div', { class: 'pin-testa' }, [h('span', {}, 'Disponibili (' + disp.length + ')'),
-        h('span', { class: 'conta' }, valori.length ? 'da ' + Math.min(...valori) + ' a ' + Math.max(...valori) + ' incarichi' : '')]),
+        h('span', { class: 'conta' }, valori.length ? 'da ' + Math.min(...valori) + ' a ' + Math.max(...valori) + ' preghiere' : '')]),
       ...disp.map(a => riga(a, max)),
-      altri.length ? h('div', { class: 'pin-testa', style: 'margin-top:26px' }, [h('span', {}, 'Solo serate o nessun incarico (' + altri.length + ')'),
-        h('span', { class: 'conta' }, 'qui sotto c\'è il loro storico')]) : null,
+      altri.length ? h('div', { class: 'pin-testa', style: 'margin-top:26px' }, [h('span', {}, 'Solo serate o nessun incarico (' + altri.length + ')')]) : null,
       ...altri.map(a => riga(a, max))
     );
   }
-  const sel = select([{ v: 'piu', t: 'Prima chi ne ha di più' }, { v: 'meno', t: 'Prima chi ne ha meno' }, { v: 'nome', t: 'In ordine di nome' }], ordine);
+  const sel = select([{ v: 'piu', t: 'Prima chi ha più preghiere' }, { v: 'meno', t: 'Prima chi ne ha meno' }, { v: 'nome', t: 'In ordine di nome' }], ordine);
   sel.onchange = () => { ordine = sel.value; disegna(); };
   const pannello = h('div');
   const apri = h('button', { class: 'b largo', onclick: () => { apri.classList.add('nascosto'); pannelloRibilancia(pannello, d, ricarica, () => apri.classList.remove('nascosto')); } }, 'Ridistribuisci le preghiere');
   area.replaceChildren(
-    h('p', { class: 'muto piccolo', style: 'margin-top:0' }, 'Il numero è il totale dell\'anno senza le serate: fatti più in programma. Tocca un nome per vedere quando e cosa.'),
+    h('p', { class: 'muto piccolo', style: 'margin-top:0' }, 'Il numero sono le preghiere dell\'anno, fatte più in programma. Sotto: serate, eventi, squadre e presenze. Tocca un nome per vedere date e incarichi.'),
     apri, pannello, sel, elenco);
   disegna();
 }
@@ -2780,25 +2838,166 @@ function pannelloRibilancia(box, d, ricarica, chiudi) {
 }
 
 async function schermataGestione(scheda, apri) {
-  scheda = scheda || 'programma';
-  const tab = h('div', { class: 'schede' }, [
-    ['programma', 'Programma'], ['squadre', 'Squadre'], ['appello', 'Appello'], ['incarichi', 'Incarichi'], ['promemoria', 'Promemoria'], ['volantini', 'Volantini'], ['eventi', 'Eventi'],
-    ['estate', 'Estate'], ['contatti', 'Contatti'], ['cruscotto', 'Cruscotto']
-  ].map(t => h('button', { class: t[0] === scheda ? 'on' : '', onclick: () => schermataGestione(t[0]) }, t[1])));
+  // nomi delle schede di prima: Programma, Incarichi e Promemoria ora sono dentro Sabati
+  if (['programma', 'incarichi', 'promemoria', 'cruscotto'].includes(scheda)) scheda = 'sabati';
+  if (scheda === 'contatti') scheda = 'squadre';
+  scheda = scheda || 'sabati';
+  let liste = null;
+  try { liste = await caricaListe(); } catch (e) { /* senza liste la scheda Estate resta visibile */ }
+  const conEstate = !liste || (liste.propostaEstate || []).length > 0;
+  const voci = [['sabati', 'Sabati'], ['presenze', 'Presenze'], ['squadre', 'Squadre'], ['appello', 'Appello'], ['volantini', 'Volantini'], ['eventi', 'Eventi']];
+  if (conEstate) voci.push(['estate', 'Estate']);
+  const tab = h('div', { class: 'schede' }, voci.map(t => h('button', { class: t[0] === scheda ? 'on' : '', onclick: () => schermataGestione(t[0]) }, t[1])));
   const contenuto = h('div', {}, h('p', { class: 'muto' }, 'Carico…'));
   mostra(h('div', {}, [h('h2', { style: 'margin-top:4px' }, 'Gestione'), tab, contenuto]));
   try {
-    if (scheda === 'programma') await gestioneProgramma(contenuto);
-    else if (scheda === 'promemoria') await gestionePromemoria(contenuto);
+    if (scheda === 'sabati') await gestioneSabati(contenuto, apri);
     else if (scheda === 'eventi') await gestioneEventi(contenuto, apri);
     else if (scheda === 'volantini') await gestioneVolantini(contenuto);
-    else if (scheda === 'incarichi') await gestioneIncarichi(contenuto);
     else if (scheda === 'appello') await gestioneAppello(contenuto);
     else if (scheda === 'squadre') await gestioneSquadre(contenuto);
-    else if (scheda === 'estate') await gestioneEstate(contenuto);
-    else if (scheda === 'contatti') await gestioneContatti(contenuto);
-    else await gestioneCruscotto(contenuto);
+    else if (scheda === 'presenze') await gestionePresenze(contenuto);
+    else await gestioneEstate(contenuto);
   } catch (e) { contenuto.replaceChildren(errore(e)); }
+}
+
+/**
+ * Sabati: tutto quello che si organizza settimana per settimana.
+ *   Un sabato   tipo di gioco, gioco scelto, preghiera, serate, postazioni, promemoria
+ *   Tutti       preghiera, serate ed eventi di tutti i sabati, con il "Da sistemare"
+ *   Animatori   chi ha quante preghiere, squadre e presenze; ridistribuzione
+ */
+async function gestioneSabati(cont, vista) {
+  vista = ['uno', 'tutti', 'animatori'].includes(vista) ? vista : (S.vistaSabati || 'uno');
+  S.vistaSabati = vista;
+  const seg = h('div', { class: 'segmento-piccolo' }, [['uno', 'Un sabato'], ['tutti', 'Tutti i sabati'], ['animatori', 'Animatori']]
+    .map(t => h('button', { class: t[0] === vista ? 'on' : '', onclick: () => gestioneSabati(cont, t[0]).catch(e => cont.replaceChildren(errore(e))) }, t[1])));
+  const area = h('div', {}, h('p', { class: 'muto' }, 'Carico…'));
+  cont.replaceChildren(seg, area);
+  if (vista === 'uno') return gestioneUnSabato(area);
+  const d = await api('incarichi');
+  const ricarica = v => gestioneSabati(cont, v === 'animatori' ? 'animatori' : 'tutti').catch(e => cont.replaceChildren(errore(e)));
+  if (vista === 'tutti') {
+    const inner = h('div');
+    const esitoSorteggio = h('div');
+    const riempi = h('button', { class: 'b secondario piccolo', onclick: async () => {
+      riempi.disabled = true;
+      try {
+        const r = await api('sorteggiaPreghiere', { rifai: false });
+        if (!r.sorteggiate) { toast('Tutte le preghiere hanno già qualcuno'); riempi.disabled = false; return; }
+        toast(r.sorteggiate + (r.sorteggiate === 1 ? ' preghiera assegnata' : ' preghiere assegnate'));
+        svuotaCacheTelefono(['sabato', 'prossimoSabato', 'avvio', 'io']);
+        ricarica('tutti');
+      } catch (e) { esitoSorteggio.replaceChildren(errore(e)); riempi.disabled = false; }
+    } }, 'Riempi le preghiere vuote');
+    area.replaceChildren(
+      h('p', { class: 'muto piccolo', style: 'margin-top:0' }, 'Preghiera, serate ed eventi (giochi e attività li fanno le squadre). Tocca un nome per sostituirlo o toglierlo, "+ Aggiungi" per mettere qualcuno: il primo proposto è il più adatto.'),
+      h('div', { class: 'azioni', style: 'margin:0 0 10px' }, riempi),
+      esitoSorteggio, inner);
+    vistaSabatiIncarichi(inner, d, ricarica);
+  } else {
+    vistaAnimatoriIncarichi(area, d, ricarica);
+  }
+}
+
+/**
+ * Presenze: chi ha detto "Ci sono" o "Non ci sono" nei prossimi sabati, per
+ * tutti gli animatori. Il cerchio blu segna chi quel sabato ha un incarico:
+ * un ✗ cerchiato di rosso è un incarico scoperto.
+ */
+async function gestionePresenze(cont) {
+  const PERIODI = {
+    vicino: { t: 'Ultimi 2 sabati e prossimi 6', indietro: 2, avanti: 6 },
+    prossimi: { t: 'Prossimi 10 sabati', indietro: 0, avanti: 10 },
+    fine: { t: 'Da oggi a fine anno', indietro: 0, avanti: 99 },
+    passati: { t: 'Ultimi 8 sabati (appello)', indietro: 8, avanti: 0 },
+    anno: { t: 'Tutto l\'anno', indietro: 99, avanti: 99 }
+  };
+  const periodo = PERIODI[S.presenzePeriodo] ? S.presenzePeriodo : 'vicino';
+  const filtro = S.presenzeFiltro || 'tutti';
+  const selPeriodo = select(Object.keys(PERIODI).map(k => ({ v: k, t: PERIODI[k].t })), periodo);
+  const seg = h('div', { class: 'segmento-piccolo' }, [['tutti', 'Tutti'], ['nessuna', 'Senza risposta'], ['assente', 'Assenti']]
+    .map(t => h('button', { class: t[0] === filtro ? 'on' : '', onclick: () => { S.presenzeFiltro = t[0]; gestionePresenze(cont).catch(e => cont.replaceChildren(errore(e))); } }, t[1])));
+  const area = h('div', {}, h('p', { class: 'muto' }, 'Carico…'));
+  selPeriodo.onchange = () => { S.presenzePeriodo = selPeriodo.value; gestionePresenze(cont).catch(e => cont.replaceChildren(errore(e))); };
+  cont.replaceChildren(selPeriodo, h('div', { style: 'height:8px' }), seg, area);
+
+  const P = PERIODI[periodo];
+  await apiVeloce('presenzeProssime', { indietro: P.indietro, avanti: P.avanti }, d => {
+    if (!d.sabati.length) { area.replaceChildren(vuoto('Nessun sabato aperto in questo periodo.')); return; }
+    const righe = d.persone.filter(p => filtro === 'tutti' || p.stati.some(x => x.s === filtro));
+    const DETTO = { presente: 'aveva detto che c\'era', assente: 'aveva detto di no', nessuna: 'non aveva risposto' };
+    const segno = x => {
+      const cl = ['pres', x.s === 'presente' ? 'si' : x.s === 'assente' ? 'no' : 'nd'];
+      if (x.v) cl.push('conf');
+      if (x.v && x.d !== 'nessuna' && x.d !== x.v) cl.push('diverso');
+      if (x.inc) cl.push('inc');
+      const titolo = x.v ? (x.v === 'presente' ? 'presente' : 'assente') + ' all\'appello (' + DETTO[x.d] + ')'
+        : (x.s === 'presente' ? 'ha detto che c\'è' : x.s === 'assente' ? 'ha detto che non c\'è' : 'non ha risposto');
+      return h('span', { class: cl.join(' '), title: titolo + (x.inc ? ' · ha un incarico' : '') }, x.s === 'presente' ? '✓' : x.s === 'assente' ? '✗' : '?');
+    };
+    const testa = h('tr', {}, [h('th', {}, 'Animatore')].concat(d.sabati.map(c => h('th', { class: c.passato ? 'passato' : '' }, [
+      h('b', {}, c.breve),
+      c.passato ? h('span', { style: 'display:block;color:' + (c.appello ? '#19703F' : 'var(--muto)') }, c.appello ? 'appello fatto' : 'senza appello')
+        : c.evento ? h('span', { style: 'display:block;max-width:80px;white-space:normal' }, c.evento) : c.serata ? h('span', { style: 'display:block' }, 'serata') : null,
+      h('span', { class: 'conti' }, [h('span', { style: 'color:#19703F' }, '✓' + c.presenti), ' ', h('span', { style: 'color:var(--rosso)' }, '✗' + c.assenti), h('br'), '?' + c.senzaRisposta])
+    ]))));
+    const corpo = righe.map(p => h('tr', {}, [h('td', { title: p.nomeVis }, p.nomeVis)]
+      .concat(p.stati.map((x, i) => h('td', { class: d.sabati[i].passato ? 'passato' : '' }, segno(x))))));
+    const scoperti = d.sabati.filter(c => c.assentiConIncarico);
+    area.replaceChildren(
+      scoperti.length ? h('div', { class: 'avviso', style: 'margin-top:0' }, 'Incarichi di chi ha detto che non c\'è: ' +
+        scoperti.map(c => c.breve + ' (' + c.assentiConIncarico + ')').join(', ') + '. Per preghiere, serate ed eventi trovi il sostituto in Sabati → Tutti i sabati.') : null,
+      righe.length ? h('div', { class: 'griglia-pres' }, h('table', {}, [h('thead', {}, testa), h('tbody', {}, corpo)]))
+        : vuoto(filtro === 'nessuna' ? 'Hanno risposto tutti in questi sabati.' : 'Nessuno risulta assente in questi sabati.'),
+      h('div', { class: 'legenda-pres' }, [
+        h('span', {}, [h('span', { class: 'pres si' }, '✓'), 'ha detto che c\'è']),
+        h('span', {}, [h('span', { class: 'pres no' }, '✗'), 'ha detto di no']),
+        h('span', {}, [h('span', { class: 'pres nd' }, '?'), 'non ha risposto']),
+        h('span', {}, [h('span', { class: 'pres si conf' }, '✓'), h('span', { class: 'pres no conf' }, '✗'), 'confermato all\'appello']),
+        h('span', {}, [h('span', { class: 'pres no conf diverso' }, '✗'), 'l\'appello dice il contrario di quanto dichiarato']),
+        h('span', {}, [h('span', { class: 'pres nd inc' }, ''), 'ha un incarico quel sabato'])
+      ]),
+      h('p', { class: 'muto piccolo' }, righe.length + (righe.length === 1 ? ' animatore' : ' animatori') + '. Scorri la tabella di lato per gli altri sabati; tieni premuto un segno per il dettaglio.')
+    );
+  });
+}
+
+/** Un sabato: la sua organizzazione e, sotto, i promemoria. */
+async function gestioneUnSabato(cont) {
+  await caricaCalendario(); await caricaAnimatori(); await caricaListe();
+  const oggi = oggiId();
+  const aperti = S.calendario.sabati.filter(s => s.tipo !== 'Chiuso');
+  const primo = (aperti.find(s => s.idData >= oggi) || aperti[aperti.length - 1] || {}).idData;
+  const area = h('div');
+  const sel = selettoreData(s => s.tipo !== 'Chiuso', S.gestioneData || primo, id => { S.gestioneData = id; carica(id); });
+  cont.replaceChildren(h('label', { style: 'margin-top:0' }, 'Sabato'), sel, area);
+
+  async function carica(idData) {
+    area.replaceChildren(h('p', { class: 'muto' }, 'Carico…'));
+    let g;
+    try { g = await api('gestioneSabato', { idData }); } catch (e) { area.replaceChildren(errore(e)); return; }
+    const scoperte = g.sabato.voci.filter(v => v.scoperto);
+    const senzaRisposta = g.sabato.voci.reduce((n, v) =>
+      n + v.persone.filter(p => p.ruolo === 'Responsabile' && p.presenza === 'nessuna').length, 0);
+    const riepilogo = scoperte.length
+      ? h('div', { class: 'errore' }, scoperte.length === 1
+          ? 'Un responsabile ha detto che non ci sarà: ' + scoperte[0].attivita
+          : scoperte.length + ' attività hanno il responsabile assente: ' + scoperte.map(v => v.attivita).join(', '))
+      : (senzaRisposta
+          ? h('div', { class: 'avviso' }, senzaRisposta + ' responsabil' + (senzaRisposta === 1 ? 'e non ha' : 'i non hanno') + ' ancora detto se ci sarà.')
+          : null);
+    // promemoria di questo sabato: si prepara solo quando si apre la tendina
+    const areaProm = h('div', {}, h('p', { class: 'muto piccolo' }, 'Preparo i messaggi…'));
+    const prom = tendina('Promemoria: notifiche e WhatsApp', null, areaProm);
+    let promCaricato = false;
+    prom.addEventListener('toggle', () => { if (prom.open && !promCaricato) { promCaricato = true; disegnaPromemoria(areaProm, idData); } });
+    area.replaceChildren(
+      riepilogo,
+      ...(g.sabato.voci.length ? g.sabato.voci.map(v => blocchettoGestioneVoce(v, g)) : [vuoto('Nessuna voce a programma per questa data.')]),
+      g.sabato.calendario.tipo !== 'Chiuso' ? h('div', { style: 'margin-top:14px' }, prom) : null);
+  }
+  carica(sel.value);
 }
 
 /**
@@ -2837,81 +3036,71 @@ function linkWhatsApp(numero, testo) {
  * Promemoria del sabato: un messaggio già pronto per ciascuno di chi ha un
  * incarico, più il riepilogo per il gruppo.
  */
-async function gestionePromemoria(cont) {
-  await caricaCalendario();
-  const oggi = oggiId();
-  const aperti = S.calendario.sabati.filter(s => s.tipo !== 'Chiuso');
-  const primo = (aperti.find(s => s.idData >= oggi) || aperti[aperti.length - 1] || {}).idData;
-  const area = h('div');
-  const sel = selettoreData(s => s.tipo !== 'Chiuso', S.promemoriaData || primo, id => { S.promemoriaData = id; carica(id); });
-  cont.replaceChildren(h('label', {}, 'Sabato'), sel, area);
+/** Promemoria di un sabato: notifiche e messaggi WhatsApp di riserva. */
+async function disegnaPromemoria(area, idData) {
+  area.replaceChildren(h('p', { class: 'muto' }, 'Preparo i messaggi…'));
+  let d;
+  // messaggi, copertura delle notifiche e orari automatici: un solo viaggio
+  let copertura, stato;
+  try {
+    const [p, c, st] = await apiInsieme([['promemoria', { idData }], 'coperturaNotifiche', 'statoAttivatore']);
+    if (!p.ok) throw p.errore;
+    d = p.dati; copertura = c; stato = st;
+  } catch (e) { area.replaceChildren(errore(e)); return; }
+  if (d.chiuso) { area.replaceChildren(vuoto('Quel sabato l\'oratorio è chiuso.')); return; }
 
-  async function carica(idData) {
-    area.replaceChildren(h('p', { class: 'muto' }, 'Preparo i messaggi…'));
-    let d;
-    // messaggi, copertura delle notifiche e orari automatici: un solo viaggio
-    let copertura, stato;
-    try {
-      const [p, c, st] = await apiInsieme([['promemoria', { idData }], 'coperturaNotifiche', 'statoAttivatore']);
-      if (!p.ok) throw p.errore;
-      d = p.dati; copertura = c; stato = st;
-    } catch (e) { area.replaceChildren(errore(e)); return; }
-    if (d.chiuso) { area.replaceChildren(vuoto('Quel sabato l\'oratorio è chiuso.')); return; }
+  // --- messaggio per il gruppo
+  const areaCopia = h('div');
+  const gruppo = h('div', { class: 'modulo' }, [
+    h('div', { class: 'titolo' }, 'Messaggio per il gruppo'),
+    h('p', { class: 'piccolo muto' }, 'Copialo e incollalo nel gruppo degli animatori.'),
+    h('pre', { style: 'white-space:pre-wrap;font:inherit;font-size:.9rem;background:var(--fondo);border-radius:var(--raggio-xs);padding:12px;margin:8px 0 0' }, d.messaggioGruppo),
+    h('div', { class: 'azioni' }, h('button', { class: 'b', onclick: () => copiaTesto(d.messaggioGruppo, areaCopia) }, 'Copia il messaggio')),
+    areaCopia
+  ]);
 
-    // --- messaggio per il gruppo
-    const areaCopia = h('div');
-    const gruppo = h('div', { class: 'modulo' }, [
-      h('div', { class: 'titolo' }, 'Messaggio per il gruppo'),
-      h('p', { class: 'piccolo muto' }, 'Copialo e incollalo nel gruppo degli animatori.'),
-      h('pre', { style: 'white-space:pre-wrap;font:inherit;font-size:.9rem;background:var(--fondo);border-radius:var(--raggio-xs);padding:12px;margin:8px 0 0' }, d.messaggioGruppo),
-      h('div', { class: 'azioni' }, h('button', { class: 'b', onclick: () => copiaTesto(d.messaggioGruppo, areaCopia) }, 'Copia il messaggio')),
-      areaCopia
+  // --- messaggi personali
+  const conNumero = d.persone.filter(p => p.telefono);
+  const righe = conNumero.map(p => {
+    const riassunto = p.incarichi.map(i => i.attivita + (i.ruolo === 'Responsabile' ? '' : ' (aiuto)')).join(' · ');
+    const areaP = h('div');
+    return h('div', { class: 'modulo' }, [
+      h('div', { class: 'titolo' }, [p.nomeVis,
+        p.presenza === 'assente' ? h('span', { class: 'etichetta rossa' }, 'ha detto che non c\'è') : null,
+        p.presenza === 'nessuna' ? h('span', { class: 'etichetta' }, 'non ha risposto') : null]),
+      h('div', { class: 'sotto' }, riassunto),
+      h('div', { class: 'azioni' }, [
+        h('a', { class: 'b', href: linkWhatsApp(p.telefono, p.messaggio), target: '_blank', rel: 'noopener' }, 'Avvisa su WhatsApp'),
+        h('button', { class: 'b secondario piccolo', onclick: () => copiaTesto(p.messaggio, areaP) }, 'Copia')
+      ]),
+      areaP
     ]);
+  });
 
-    // --- messaggi personali
-    const conNumero = d.persone.filter(p => p.telefono);
-    const righe = conNumero.map(p => {
-      const riassunto = p.incarichi.map(i => i.attivita + (i.ruolo === 'Responsabile' ? '' : ' (aiuto)')).join(' · ');
-      const areaP = h('div');
-      return h('div', { class: 'modulo' }, [
-        h('div', { class: 'titolo' }, [p.nomeVis,
-          p.presenza === 'assente' ? h('span', { class: 'etichetta rossa' }, 'ha detto che non c\'è') : null,
-          p.presenza === 'nessuna' ? h('span', { class: 'etichetta' }, 'non ha risposto') : null]),
-        h('div', { class: 'sotto' }, riassunto),
-        h('div', { class: 'azioni' }, [
-          h('a', { class: 'b', href: linkWhatsApp(p.telefono, p.messaggio), target: '_blank', rel: 'noopener' }, 'Avvisa su WhatsApp'),
-          h('button', { class: 'b secondario piccolo', onclick: () => copiaTesto(p.messaggio, areaP) }, 'Copia')
-        ]),
-        areaP
-      ]);
-    });
+  const senza = d.senzaNumero.length ? h('div', { class: 'avviso' }, [
+    h('div', { style: 'font-weight:700;margin-bottom:4px' }, 'Senza un numero utilizzabile (' + d.senzaNumero.length + ')'),
+    h('div', { class: 'piccolo' }, d.senzaNumero.map(x => x.nomeVis + (x.contatto ? ' — ' + x.contatto : '')).join(', ')),
+    h('div', { class: 'piccolo', style: 'margin-top:6px' }, 'Correggi il contatto in Anagrafica per farli comparire qui.')
+  ]) : null;
 
-    const senza = d.senzaNumero.length ? h('div', { class: 'avviso' }, [
-      h('div', { style: 'font-weight:700;margin-bottom:4px' }, 'Senza un numero utilizzabile (' + d.senzaNumero.length + ')'),
-      h('div', { class: 'piccolo' }, d.senzaNumero.map(x => x.nomeVis + (x.contatto ? ' — ' + x.contatto : '')).join(', ')),
-      h('div', { class: 'piccolo', style: 'margin-top:6px' }, 'Correggi il contatto in Anagrafica per farli comparire qui.')
-    ]) : null;
+  // --- invio delle notifiche
+  const areaPush = h('div');
+  const push = h('div', { class: 'modulo' }, [
+    h('div', { class: 'titolo' }, 'Notifiche'),
+    areaPush
+  ]);
+  disegnaInvioPush(areaPush, idData, copertura, stato);
 
-    // --- invio delle notifiche
-    const areaPush = h('div');
-    const push = h('div', { class: 'modulo' }, [
-      h('div', { class: 'titolo' }, 'Notifiche'),
-      areaPush
-    ]);
-    disegnaInvioPush(areaPush, idData, copertura, stato);
-
-    area.replaceChildren(
-      push,
-      tendina('Messaggi WhatsApp di riserva', conNumero.length, h('div', {}, [
-      gruppo,
-      h('h2', {}, 'Uno per uno (' + conNumero.length + ')'),
-      h('p', { class: 'piccolo muto', style: 'margin-top:-6px' }, 'Ogni pulsante apre WhatsApp sulla chat della persona con il messaggio già scritto: devi solo premere invio.'),
-      senza,
-      ...righe
-      ]))
-    );
-  }
-  carica(sel.value);
+  area.replaceChildren(
+    push,
+    tendina('Messaggi WhatsApp di riserva', conNumero.length, h('div', {}, [
+    gruppo,
+    h('h2', {}, 'Uno per uno (' + conNumero.length + ')'),
+    h('p', { class: 'piccolo muto', style: 'margin-top:-6px' }, 'Ogni pulsante apre WhatsApp sulla chat della persona con il messaggio già scritto: devi solo premere invio.'),
+    senza,
+    ...righe
+    ]))
+  );
 }
 
 /** Pulsante di invio immediato e stato della copertura. */
@@ -3098,9 +3287,14 @@ async function gestioneAppello(cont, scelta) {
   const DICH = { presente: ['aveva detto: ci sono', 'si'], assente: ['aveva detto: non ci sono', 'no'], nessuna: ['non aveva risposto', ''] };
   const lista = h('div', { class: 'modulo' });
   const tuttiDichiarati = h('button', { class: 'b secondario piccolo', onclick: () => {
-    d.persone.forEach(p => { if (p.dichiarato === 'presente' && !valori[p.id]) valori[p.id] = 'Presente'; });
+    // chi ha risposto viene segnato come ha detto; chi non ha risposto resta da segnare a mano
+    d.persone.forEach(p => {
+      if (valori[p.id]) return;
+      if (p.dichiarato === 'presente') valori[p.id] = 'Presente';
+      else if (p.dichiarato === 'assente') valori[p.id] = 'Assente';
+    });
     gestioneAppelloRidisegna();
-  } }, 'Chi ha detto "Ci sono" era presente');
+  } }, 'Segna come hanno risposto');
   function gestioneAppelloRidisegna() {
     // si ridisegnano le righe con i valori correnti
     lista.replaceChildren(...d.persone.map(p => h('div', { class: 'riga-scelta' }, [
@@ -3141,35 +3335,6 @@ function selettoreData(filtro, iniziale, onChange) {
   return sel;
 }
 
-async function gestioneProgramma(cont) {
-  await caricaCalendario(); await caricaAnimatori(); await caricaListe();
-  const oggi = oggiId();
-  const aperti = S.calendario.sabati.filter(s => s.tipo !== 'Chiuso');
-  const primo = (aperti.find(s => s.idData >= oggi) || aperti[aperti.length - 1] || {}).idData;
-  const area = h('div');
-  const sel = selettoreData(s => s.tipo !== 'Chiuso', S.gestioneData || primo, id => { S.gestioneData = id; carica(id); });
-  cont.replaceChildren(h('label', {}, 'Sabato'), sel, area);
-
-  async function carica(idData) {
-    area.replaceChildren(h('p', { class: 'muto' }, 'Carico…'));
-    let g;
-    try { g = await api('gestioneSabato', { idData }); } catch (e) { area.replaceChildren(errore(e)); return; }
-    if (!g.sabato.voci.length) { area.replaceChildren(vuoto('Nessuna voce a programma per questa data.')); return; }
-    const scoperte = g.sabato.voci.filter(v => v.scoperto);
-    const senzaRisposta = g.sabato.voci.reduce((n, v) =>
-      n + v.persone.filter(p => p.ruolo === 'Responsabile' && p.presenza === 'nessuna').length, 0);
-    const riepilogo = scoperte.length
-      ? h('div', { class: 'errore' }, scoperte.length === 1
-          ? 'Un responsabile ha detto che non ci sarà: ' + scoperte[0].attivita
-          : scoperte.length + ' attività hanno il responsabile assente: ' + scoperte.map(v => v.attivita).join(', '))
-      : (senzaRisposta
-          ? h('div', { class: 'avviso' }, senzaRisposta + ' responsabil' + (senzaRisposta === 1 ? 'e non ha' : 'i non hanno') + ' ancora detto se ci sarà.')
-          : h('div', { class: 'modulo', style: 'text-align:center' }, h('span', { class: 'muto piccolo' }, 'Tutti i responsabili hanno confermato la presenza.')));
-    area.replaceChildren(riepilogo, ...g.sabato.voci.map(v => blocchettoGestioneVoce(v, g)));
-  }
-  carica(sel.value);
-}
-
 /** Voce di programma nel pannello di gestione: dettaglio, note, assegnazioni. */
 function blocchettoGestioneVoce(v, g) {
   const box = h('div', { class: 'modulo' });
@@ -3182,7 +3347,7 @@ function blocchettoGestioneVoce(v, g) {
       tipologia = select(g.rotazione.map(r => ({ v: r.id, t: r.nome })), v.idAtt);
       tipologia.onchange = async () => {
         if (!confirm('Cambiare la tipologia di gioco di questo sabato? Gioco scelto, persone e postazioni vengono sostituiti con la squadra della nuova tipologia.')) { tipologia.value = v.idAtt; return; }
-        try { await api('cambiaTipoGioco', { idData: g.sabato.calendario.idData, idAtt: tipologia.value }); toast('Tipologia cambiata'); schermataGestione('programma'); }
+        try { await api('cambiaTipoGioco', { idData: g.sabato.calendario.idData, idAtt: tipologia.value }); toast('Tipologia cambiata'); schermataGestione('sabati'); }
         catch (e) { toast(e, true); tipologia.value = v.idAtt; }
       };
     }
@@ -3276,7 +3441,7 @@ function editorPostazioni(v, g) {
     } }, 'Salva');
     const elimina = h('button', { class: 'b pericolo piccolo', onclick: async () => {
       if (!confirm('Eliminare la postazione ' + p.n + '?')) return;
-      try { await api('salvaPostazione', { idProg: v.idProg, nPostazione: p.n, elimina: true }); toast('Eliminata'); schermataGestione('programma'); }
+      try { await api('salvaPostazione', { idProg: v.idProg, nPostazione: p.n, elimina: true }); toast('Eliminata'); schermataGestione('sabati'); }
       catch (e) { toast(e, true); }
     } }, 'Elimina');
     dove.replaceChildren(h('div', { class: 'modulo', style: 'margin:8px 0' }, [
@@ -3326,31 +3491,22 @@ async function gestioneEstate(cont) {
   cont.replaceChildren(h('div', { style: 'overflow-x:auto' }, tab));
 }
 
-async function gestioneContatti(cont) {
-  const c = await api('contatti');
-  cont.replaceChildren(h('table', {}, [
-    h('thead', {}, h('tr', {}, [h('th', {}, 'Nome'), h('th', {}, 'Grado'), h('th', {}, 'Contatto')])),
-    h('tbody', {}, c.map(a => h('tr', {}, [h('td', {}, a.nome), h('td', {}, a.grado), h('td', {}, a.contatto ? (/^\+?\d[\d\s]+$/.test(a.contatto) ? h('a', { href: 'tel:' + a.contatto.replace(/\s/g, '') }, a.contatto) : a.contatto) : h('span', { class: 'muto' }, '—'))])))
-  ]));
-}
-
-async function gestioneCruscotto(cont) {
-  const righe = await api('cruscotto');
-  cont.replaceChildren(h('table', {}, h('tbody', {}, righe.map(r => h('tr', {}, r.filter((c, i) => i < 5).map(c => h('td', {}, c)))))));
-}
 
 /* =====================================================================
    SCHERMATA 7 — AMMINISTRAZIONE
    ===================================================================== */
 async function schermataAdmin(scheda) {
+  if (['preghiere'].includes(scheda)) { vai('gestione'); return; }
+  if (scheda === 'calendar') scheda = 'calendario';
+  if (scheda === 'controlli') scheda = 'riepilogo';
   scheda = scheda || 'pin';
   const tab = h('div', { class: 'schede' }, [
-    ['pin', 'PIN'], ['notifiche', 'Notifiche'], ['preghiere', 'Preghiere'], ['calendar', 'Google Calendar'], ['controlli', 'Controlli'], ['calendario', 'Calendario'], ['anagrafica', 'Anagrafica'], ['riepilogo', 'Riepilogo anno'], ['archivio', 'Fine anno']
+    ['pin', 'PIN'], ['anagrafica', 'Anagrafica'], ['calendario', 'Calendario'], ['notifiche', 'Notifiche'], ['riepilogo', 'Riepilogo anno'], ['archivio', 'Fine anno']
   ].map(t => h('button', { class: t[0] === scheda ? 'on' : '', onclick: () => schermataAdmin(t[0]) }, t[1])));
   const cont = h('div', {}, h('p', { class: 'muto' }, 'Carico…'));
   mostra(h('div', {}, [h('h2', { style: 'margin-top:4px' }, 'Amministrazione'), tab, cont]));
   try {
-    await ({ pin: adminPin, notifiche: adminNotifiche, preghiere: adminPreghiere, calendar: adminCalendar, controlli: adminControlli, calendario: adminCalendario, anagrafica: adminAnagrafica, riepilogo: adminRiepilogo, archivio: adminArchivio })[scheda](cont);
+    await ({ pin: adminPin, notifiche: adminNotifiche, calendario: adminCalendario, anagrafica: adminAnagrafica, riepilogo: adminRiepilogo, archivio: adminArchivio })[scheda](cont);
   } catch (e) { cont.replaceChildren(errore(e)); }
 }
 
@@ -3546,28 +3702,7 @@ async function adminNotifiche(cont) {
   );
 }
 
-async function adminPreghiere(cont) {
-  const esito = h('div');
-  const rifai = h('input', { type: 'checkbox', style: 'width:auto;min-height:0;margin-right:8px' });
-  const btn = h('button', { class: 'b', onclick: async () => {
-    if (rifai.checked && !confirm('Rifare TUTTE le estrazioni dei sabati futuri? Chi recita resta.')) return;
-    btn.disabled = true;
-    try {
-      const r = await api('sorteggiaPreghiere', { rifai: rifai.checked });
-      esito.replaceChildren(r.sorteggiate
-        ? h('div', {}, [h('p', {}, r.sorteggiate + ' preghiere sorteggiate.'), h('div', { class: 'pinlista' }, r.righe.join('\n'))])
-        : h('p', { class: 'muto' }, 'Tutti i sabati futuri hanno già chi prepara la preghiera.'));
-    } catch (e) { esito.replaceChildren(errore(e)); }
-    btn.disabled = false;
-  } }, 'Sorteggia le preghiere');
-  cont.replaceChildren(
-    h('p', {}, 'Per ogni sabato futuro senza nessuno assegnato estrae un Animatore che la prepara e un Aiutoanimatore che lo aiuta, bilanciando i carichi ed evitando le coppie già uscite. Chi la recita si sceglie a mano, nel programma, con il ruolo «Recita».'),
-    h('label', {}, [rifai, 'Rifai anche i sabati già assegnati']),
-    h('div', { style: 'margin-top:12px' }, btn), esito
-  );
-}
-
-async function adminCalendar(cont) {
+async function bloccoGoogleCalendar(cont) {
   const esito = h('div');
   const btn = h('button', { class: 'b', onclick: async () => {
     btn.disabled = true; esito.replaceChildren(h('p', { class: 'muto' }, 'Creo gli eventi… può volerci un minuto.'));
@@ -3575,10 +3710,10 @@ async function adminCalendar(cont) {
     catch (e) { esito.replaceChildren(errore(e)); }
     btn.disabled = false;
   } }, 'Crea o aggiorna gli eventi');
-  cont.replaceChildren(h('p', {}, 'Scrive un evento per ogni sabato aperto sul calendario dell\'account oratorio, con orari, giochi e responsabili. Rilanciarlo aggiorna gli eventi esistenti senza duplicarli.'), btn, esito);
+  cont.replaceChildren(h('p', { class: 'piccolo muto', style: 'margin-top:0' }, 'Scrive un evento per ogni sabato aperto sul calendario dell\'account oratorio, con orari, giochi e responsabili. Rilanciarlo aggiorna gli eventi esistenti senza duplicarli. Ognuno può anche mettere il proprio calendario nel telefono da Io.'), btn, esito);
 }
 
-async function adminControlli(cont) {
+async function bloccoControlli(cont) {
   const esito = h('div');
   const btn = h('button', { class: 'b', onclick: async () => {
     btn.disabled = true;
@@ -3586,14 +3721,17 @@ async function adminControlli(cont) {
     catch (e) { esito.replaceChildren(errore(e)); }
     btn.disabled = false;
   } }, 'Esegui i controlli');
-  cont.replaceChildren(h('p', {}, 'Cerca voci senza dettaglio, senza responsabile, ID inesistenti e incoerenze.'), btn, esito);
+  cont.replaceChildren(h('p', { class: 'piccolo muto', style: 'margin-top:0' }, 'Controlli tecnici sul foglio: ID inesistenti, righe orfane, voci duplicate e incoerenze.'), btn, esito);
 }
 
 async function adminCalendario(cont) {
   azzera('calendario'); await caricaCalendario();
   const area = h('div');
   const sel = selettoreData(null, S.calendario.sabati[0].idData, disegna);
-  cont.replaceChildren(h('label', {}, 'Sabato'), sel, area);
+  const areaGc = h('div');
+  bloccoGoogleCalendar(areaGc);
+  cont.replaceChildren(h('label', {}, 'Sabato'), sel, area,
+    h('div', { style: 'margin-top:18px' }, tendina('Google Calendar dell\'oratorio', null, areaGc)));
   function disegna(idData) {
     const s = S.calendario.sabati.find(x => x.idData === idData);
     const tipo = select(S.calendario.tipi, s.tipo);
@@ -3676,9 +3814,48 @@ async function gestioneSquadre(cont) {
   });
   sel.value = d.attivita.some(a => a.id === S.squadraAtt) ? S.squadraAtt : d.attivita[0].id;
   sel.onchange = () => { S.squadraAtt = sel.value; disegna(); };
+  // chi è in una squadra ma non può più farla: si vede subito, con un tocco si apre la squadra
+  const boxAvvisi = h('div');
+  function avvisi() {
+    const per = {};
+    (d.problemi || []).forEach(x => { (per[x.idAtt] = per[x.idAtt] || []).push(x); });
+    const nomi = id => (d.animatori.find(a => a.id === id) || {}).nomeVis || id;
+    const voci = Object.keys(per).map(idAtt => {
+      const att = d.attivita.find(a => a.id === idAtt) || { nome: idAtt };
+      return h('button', { class: 'chip-persona problema', style: 'margin:4px 6px 0 0', onclick: () => { sel.value = idAtt; S.squadraAtt = idAtt; disegna(); } },
+        [att.nome + ': ', h('small', { class: 'motivo' }, per[idAtt].map(x => nomi(x.idAnimatore) + ' (' + x.motivo + ')').join(', '))]);
+    });
+    boxAvvisi.replaceChildren(voci.length ? h('div', { class: 'modulo', style: 'border-color:#F0B9BB' }, [
+      h('div', { class: 'ria-testa' }, 'Da sistemare nelle squadre'),
+      h('p', { class: 'piccolo muto', style: 'margin:0' }, 'Queste persone non possono più fare giochi o attività: toglile dalla squadra o mettine un\'altra al loro posto.'),
+      h('div', {}, voci)]) : null);
+  }
+  avvisi();
+  // rubrica: numeri di tutti, si carica solo se la si apre
+  const areaRubrica = h('div', {}, h('p', { class: 'muto piccolo' }, 'Carico…'));
+  const rubrica = tendina('Rubrica: i numeri di tutti', null, areaRubrica);
+  let rubricaCaricata = false;
+  rubrica.addEventListener('toggle', async () => {
+    if (!rubrica.open || rubricaCaricata) return;
+    rubricaCaricata = true;
+    try {
+      const c = await api('contatti');
+      areaRubrica.replaceChildren(...c.map(x => {
+        const cifre = String(x.contatto || '').replace(/\D/g, '');
+        const wa = cifre.length === 10 && cifre[0] === '3' ? '39' + cifre : (cifre.length >= 11 ? cifre.replace(/^00/, '') : '');
+        return h('div', { class: 'riga-scelta' }, [
+          h('div', { class: 'chi' }, [x.nomeVis, h('small', {}, x.grado + (x.contatto ? ' · ' + x.contatto : ' · nessun contatto'))]),
+          h('div', { class: 'scelta-due' }, [
+            cifre.length >= 9 ? h('a', { class: 'b secondario piccolo', href: 'tel:' + String(x.contatto).replace(/\s/g, '') }, 'Chiama') : null,
+            wa ? h('a', { class: 'b secondario piccolo', href: 'https://wa.me/' + wa, target: '_blank', rel: 'noopener' }, 'WhatsApp') : null
+          ])
+        ]);
+      }));
+    } catch (e) { areaRubrica.replaceChildren(errore(e)); }
+  });
   cont.replaceChildren(
-    h('p', { class: 'muto piccolo', style: 'margin-top:0' }, 'Giochi e attività li fa sempre la loro squadra: quando cambi qualcuno qui, cambia in tutti i sabati futuri. Sabato per sabato si organizzano solo preghiera, serate ed eventi (in Programma).'),
-    h('label', {}, 'Squadra'), sel, area);
+    h('p', { class: 'muto piccolo', style: 'margin-top:0' }, 'Giochi e attività li fa sempre la loro squadra: quando cambi qualcuno qui, cambia in tutti i sabati futuri. Sabato per sabato si organizzano solo preghiera, serate ed eventi (in Incarichi).'),
+    boxAvvisi, h('label', {}, 'Squadra'), sel, area, h('div', { style: 'margin-top:18px' }, rubrica));
 
   function disegna() {
     const a = d.attivita.find(x => x.id === sel.value) || {};
@@ -3687,17 +3864,21 @@ async function gestioneSquadre(cont) {
       ? (a.sabati ? 'Tocca a questa squadra in ' + a.sabati + (a.sabati === 1 ? ' sabato' : ' sabati') + ' da qui a fine anno' + (a.prossimo ? ', il prossimo è il ' + a.prossimo : '') + '.' : 'Per ora nessun sabato in programma per questa squadra.')
       : a.gruppo === 2 ? 'Vale ogni sabato aperto, sempre con questa squadra.'
       : 'Questo è solo l\'elenco di chi può farlo: chi lo fa ogni volta si sceglie in Programma.';
+    const problemaDi = id => ((d.problemi || []).find(x => x.idAtt === sel.value && x.idAnimatore === id) || {}).motivo;
     const righe = membri.map(q => {
       const ruolo = select(d.ruoli, q.ruolo); ruolo.style.width = 'auto'; ruolo.style.minHeight = '36px';
       ruolo.onchange = async () => { try { const r = await api('salvaSquadra', { idAtt: q.idAtt, idAnimatore: q.idAnimatore, ruolo: ruolo.value }); q.ruolo = ruolo.value; dopoSquadra(r, 'Ruolo aggiornato'); } catch (e) { toast(e, true); } };
       return h('div', { class: 'riga-scelta' }, [
-        h('div', { class: 'chi' }, [q.nomeVis, a.diSquadra && d.inSquadre[q.idAnimatore] > 1 ? h('small', {}, 'in ' + d.inSquadre[q.idAnimatore] + ' squadre') : null]),
+        h('div', { class: 'chi' }, [q.nomeVis, problemaDi(q.idAnimatore) ? h('small', { class: 'no' }, problemaDi(q.idAnimatore) + ': toglilo o sostituiscilo')
+          : a.diSquadra && d.inSquadre[q.idAnimatore] > 1 ? h('small', {}, 'in ' + d.inSquadre[q.idAnimatore] + ' squadre') : null]),
         ruolo,
         h('button', { class: 'b pericolo piccolo', onclick: async () => {
           if (!confirm('Togliere ' + q.nomeVis + ' dalla squadra' + (a.diSquadra ? '? Non avrà più ' + a.nome + ' nei sabati futuri.' : '?'))) return;
           try {
             const r = await api('rimuoviSquadra', { idAtt: q.idAtt, idAnimatore: q.idAnimatore });
             d.squadre = d.squadre.filter(x => x !== q);
+            d.problemi = (d.problemi || []).filter(x => !(x.idAtt === q.idAtt && x.idAnimatore === q.idAnimatore));
+            avvisi();
             if (a.diSquadra) d.inSquadre[q.idAnimatore] = Math.max(0, (d.inSquadre[q.idAnimatore] || 1) - 1);
             disegna(); dopoSquadra(r, 'Tolto');
           } catch (e) { toast(e, true); }
@@ -3769,7 +3950,8 @@ async function adminRiepilogo(cont) {
     sezione('Collezione dei santi', h('div', {}, [
       h('p', { style: 'margin:0' }, r.collezione.conCarte + ' animatori hanno almeno una carta, in media ' + r.collezione.media + ' su ' + r.collezione.totale + '.'),
       h('p', { style: 'margin:6px 0 0' }, r.collezione.completate.length ? 'Collezionisti di Santi: ' + r.collezione.completate.join(', ') + '.' : 'Nessuno ha ancora completato la collezione.')])),
-    sezione('Volantini', h('p', { style: 'margin:0' }, r.volantini.pubblicati + ' pubblicati su ' + r.volantini.totale + ' preparati.'))
+    sezione('Volantini', h('p', { style: 'margin:0' }, r.volantini.pubblicati + ' pubblicati su ' + r.volantini.totale + ' preparati.')),
+    (() => { const a = h('div'); bloccoControlli(a); return h('div', { class: 'no-stampa', style: 'margin-top:18px' }, tendina('Controlli di coerenza del foglio', null, a)); })()
   );
 }
 
