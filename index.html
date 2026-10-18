@@ -626,7 +626,7 @@
    ===================================================================== */
 // Cambia a ogni modifica dell'interfaccia: compare in fondo alla scheda "Io",
 // così si capisce subito se il telefono sta eseguendo la versione aggiornata.
-const VERSIONE_APP = '2026.10.16d';
+const VERSIONE_APP = '2026.10.18';
 
 /* =====================================================================
    CONFIGURAZIONE
@@ -707,6 +707,7 @@ const ICONE = {
   orologio:  'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3.2 2',
   luogo:     'M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11zM12 12.4a2.4 2.4 0 1 0 0-4.8 2.4 2.4 0 0 0 0 4.8z',
   giorno:    'M8 3v3M16 3v3M3.5 9.5h17M4.5 6.5h15a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-12a1 1 0 0 1 1-1z',
+  gruppo:    'M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20c0-3.3 2.9-5.5 6.5-5.5s6.5 2.2 6.5 5.5M16 4.3a3.3 3.3 0 0 1 0 6.4M17.5 14.7c2.4.5 4 2.3 4 5',
   nota:      'M5 4.5h14a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-8l-4.5 3.5v-3.5H5a1 1 0 0 1-1-1v-10a1 1 0 0 1 1-1zM8 9h8M8 12.5h5'
 };
 
@@ -936,6 +937,43 @@ function bloccoMerenda(daComprare) {
    Calendario, riepilogo dei sabati (cosa si fa e chi è responsabile),
    turni di presenza fra adulti, merenda.
    ===================================================================== */
+/** Per gli adulti: gli animatori di un sabato divisi per risposta, con l'esito dell'appello. */
+function bloccoAnimatoriSabato(lista, cal) {
+  const stato = x => x.v || x.d;
+  const gruppi = [['presente', 'Ci sono'], ['assente', 'Non ci sono'], ['nessuna', 'Non hanno risposto']];
+  const appelloFatto = lista.some(x => x.v);
+  const nome = x => h('span', { class: 'chip-persona', style: 'cursor:default' + (x.v ? ';border-color:' + (x.v === 'presente' ? '#19A35B' : 'var(--rosso)') : '') },
+    [x.nomeVis, x.inc ? h('small', {}, ' · incarico') : null, x.v && x.d !== 'nessuna' && x.d !== x.v ? h('small', { class: 'motivo' }, x.v === 'presente' ? ' · aveva detto di no' : ' · aveva detto sì') : null]);
+  const passato = cal.idData <= oggiId();
+  return h('div', {}, [
+    h('h2', {}, 'Animatori'),
+    h('div', { class: 'modulo' }, [
+      appelloFatto ? h('div', { class: 'etichetta verde', style: 'margin-bottom:8px' }, 'appello fatto') : null,
+      ...gruppi.map(g => {
+        const chi = lista.filter(x => stato(x) === g[0]);
+        if (!chi.length) return null;
+        const dentro = h('div', { class: 'inc-persone' }, chi.map(nome));
+        return g[0] === 'nessuna' ? h('div', { style: 'margin-top:8px' }, tendina(g[1], chi.length, dentro))
+          : h('div', { style: 'margin-top:8px' }, [h('div', { class: 'ria-testa' }, [g[1], h('span', { class: 'conta-piccola' }, String(chi.length))]), dentro]);
+      }),
+      passato ? h('div', { class: 'azioni' }, h('button', { class: 'b secondario', onclick: () => schermataPresenzeAdulti('appello', { tipo: 'sabato', id: cal.idData }) }, appelloFatto ? 'Correggi l\'appello' : 'Fai l\'appello')) : null
+    ])
+  ]);
+}
+
+/** Per gli adulti: la tabella di chi c'è nei sabati e l'appello. */
+async function schermataPresenzeAdulti(vista, scelta) {
+  segnaNav('presenze');
+  vista = vista || S.vistaPresenzeAdulti || 'tabella';
+  S.vistaPresenzeAdulti = vista;
+  const cont = h('div', {}, h('p', { class: 'muto' }, 'Carico…'));
+  const seg = h('div', { class: 'segmento-piccolo' }, [['tabella', 'Chi c\'è'], ['appello', 'Appello']]
+    .map(t => h('button', { class: t[0] === vista ? 'on' : '', onclick: () => schermataPresenzeAdulti(t[0]) }, t[1])));
+  mostra(h('div', {}, [h('h2', { style: 'margin-top:4px' }, 'Presenze degli animatori'), seg, cont]));
+  try { if (vista === 'appello') await gestioneAppello(cont, scelta); else await gestionePresenze(cont); }
+  catch (e) { cont.replaceChildren(errore(e)); }
+}
+
 async function schermataSabatoAdulti(idData) {
   mostra(h('p', { class: 'muto' }, 'Carico il sabato…'));
   try { await apiVeloce('sabatoAdulti', idData ? { idData } : {}, d => mostra(vistaSabatoAdulti(d))); }
@@ -994,13 +1032,16 @@ function vistaSabatoAdulti(d) {
     (via.length ? ' · Non ci sono: ' + via.join(', ') : '')));
   box.appendChild(bloccoMerenda(d.merenda));
 
-  box.appendChild(h('h2', {}, 'Cosa si fa'));
-  if (!d.voci.length) box.appendChild(vuoto('Programma non ancora definito.'));
-  box.appendChild(h('div', { class: 'lista' }, d.voci.map(v => h('div', { class: 'riga' }, [
-    h('div', { class: 'titolo' }, v.attivita),
-    v.cosa ? h('div', {}, v.cosa) : null,
-    h('div', { class: 'sotto' }, v.responsabili.length ? 'Responsabile: ' + v.responsabili.join(', ') : 'Responsabile da definire')
-  ]))));
+  // gli animatori: chi c'è, chi no, chi non ha risposto, e l'appello
+  if (d.animatori) box.appendChild(bloccoAnimatoriSabato(d.animatori, cal));
+  // cosa si fa: lo stesso programma che vedono gli animatori, con tutte le persone
+  if (d.sabato) bloccoProgramma(d.sabato).forEach(el => box.appendChild(el));
+  else {
+    box.appendChild(h('h2', {}, 'Cosa si fa'));
+    box.appendChild(h('div', { class: 'lista' }, (d.voci || []).map(v => h('div', { class: 'riga' }, [
+      h('div', { class: 'titolo' }, v.attivita), v.cosa ? h('div', {}, v.cosa) : null,
+      h('div', { class: 'sotto' }, v.responsabili.length ? 'Responsabile: ' + v.responsabili.join(', ') : 'Responsabile da definire')]))));
+  }
   if (!d.prossimo) box.appendChild(h('div', { class: 'azioni' }, h('button', { class: 'b secondario', onclick: () => schermataSabato() }, 'Vai al prossimo sabato')));
   return box;
 }
@@ -1042,7 +1083,7 @@ function bloccoMieiSabati(lista) {
     sceltaDue(x.presenza, ['Ci sono', 'No'], ['presente', 'assente'], async v => {
       const r = await api('salvaPresenza', { idData: x.idData, stato: v === 'presente' });
       x.presenza = v;
-      svuotaCacheTelefono(['io', 'prossimoSabato', 'sabato', 'avvio']);
+      svuotaCacheTelefono(['io', 'prossimoSabato', 'prossimo', 'sabato', 'avvio']);
       toast(v === 'presente' ? 'Presenza confermata' : 'Assenza registrata');
       if (r.nuoveCarte && r.nuoveCarte.length) mostraCarteNuove({ nuove: r.nuoveCarte, trofeoNuovo: r.trofeoNuovo });
     })
@@ -1266,22 +1307,23 @@ async function avvio() {
   if (salvato && salvato.io) {
     S.utente = salvato.io.utente;
     dopoAccesso();
-    if (S.utente.adulto) schermataSabato();
-    else if (salvato.sabato) mostra(vistaSabato(salvato.sabato));
+    if (salvato.prossimo) { segnaNav('sabato'); mostra(vistaProssimo(salvato.prossimo)); }
+    else schermataSabato();
   }
-  // 2. intanto i dati aggiornati: chi sono e il prossimo sabato, in un solo viaggio
+  // 2. intanto i dati aggiornati: chi sono, il prossimo sabato e il prossimo appuntamento, in un solo viaggio
   try {
-    const [io, sabato] = await apiInsieme(['io', 'prossimoSabato']);
+    const [io, prossimo] = await apiInsieme(['io', 'prossimo']);
     if (!io.ok) throw io.errore;
     const prima = S.utente;
     S.utente = io.dati.utente;
-    scriviCache(kAvvio, { io: io.dati, sabato: sabato.ok ? sabato.dati : null });
+    scriviCache(kAvvio, { io: io.dati, prossimo: prossimo.ok ? prossimo.dati : null });
     scriviCache(chiaveCache('io', {}), io.dati);
+    if (prossimo.ok) scriviCache(chiaveCache('prossimo', {}), prossimo.dati);
     if (!prima || prima.livello !== S.utente.livello || prima.grado !== S.utente.grado) {
       dopoAccesso();
-      schermataSabato(null, S.utente.adulto ? null : (sabato.ok ? sabato.dati : null));
-    } else if (!S.utente.adulto && S.schermata === 'sabato' && sabato.ok && JSON.stringify(sabato.dati) !== JSON.stringify(salvato.sabato)) {
-      const y = window.scrollY; mostra(vistaSabato(sabato.dati)); window.scrollTo(0, y);
+      schermataSabato(null, prossimo.ok ? prossimo.dati : null);
+    } else if (S.schermata === 'sabato' && S.vistaProssimo && prossimo.ok && JSON.stringify(prossimo.dati) !== JSON.stringify(salvato && salvato.prossimo)) {
+      const y = window.scrollY; mostra(vistaProssimo(prossimo.dati)); window.scrollTo(0, y);
     }
     mostraCarteNuove(io.dati.collezione);
     // in sottofondo: calendario e giochi, così le altre schede si aprono subito
@@ -1393,11 +1435,12 @@ function dopoAccesso() {
   nav.classList.remove('nascosto');
   // gli adulti hanno solo il sabato (in riepilogo), il calendario e la loro scheda
   const voci = S.utente.adulto ? [
-    ['sabato', 'sabato', 'Sabato'],
+    ['sabato', 'sabato', 'Prossimo'],
+    ['presenze', 'gruppo', 'Presenze'],
     ['calendario', 'anno', 'Anno'],
     ['io', 'io', 'Io']
   ] : [
-    ['sabato', 'sabato', 'Sabato'],
+    ['sabato', 'sabato', 'Prossimo'],
     ['io', 'io', 'Io'],
     ['calendario', 'anno', 'Anno'],
     ['giochi', 'giochi', 'Giochi']
@@ -1420,8 +1463,8 @@ function segnaNav(nome) {
 
 function vai(nome) {
   segnaNav(nome);
-  ({ sabato: schermataSabato, io: schermataIo, calendario: schermataCalendario, giochi: schermataGiochi,
-     gestione: schermataGestione, admin: schermataAdmin })[nome]();
+  ({ sabato: () => schermataSabato(), io: schermataIo, calendario: schermataCalendario, giochi: schermataGiochi,
+     gestione: schermataGestione, admin: schermataAdmin, presenze: () => schermataPresenzeAdulti() })[nome]();
 }
 
 function esci() {
@@ -1441,13 +1484,117 @@ async function caricaCalendario() { return caricaConMemoria('calendario', 'calen
 /* =====================================================================
    SCHERMATA 2 — SABATO
    ===================================================================== */
+/**
+ * Senza data: la schermata "Prossimo", con il prossimo sabato e il prossimo
+ * appuntamento in calendario. Con una data: quel sabato.
+ */
 async function schermataSabato(idData, giaCaricato) {
   segnaNav('sabato');
+  if (!idData) {
+    if (giaCaricato) { mostra(vistaProssimo(giaCaricato)); return; }
+    mostra(h('p', { class: 'muto' }, 'Carico…'));
+    try { await apiVeloce('prossimo', {}, d => mostra(vistaProssimo(d))); }
+    catch (e) { mostra(errore(e)); }
+    return;
+  }
+  S.vistaProssimo = false;
   if (S.utente && S.utente.adulto) return schermataSabatoAdulti(idData);
-  if (giaCaricato) { mostra(vistaSabato(giaCaricato)); return; }
   mostra(h('p', { class: 'muto' }, 'Carico il programma…'));
-  try { await apiVeloce(idData ? 'sabato' : 'prossimoSabato', idData ? { idData } : {}, d => mostra(vistaSabato(d))); }
+  try { await apiVeloce('sabato', { idData }, d => mostra(vistaSabato(d))); }
   catch (e) { mostra(errore(e)); }
+}
+
+/** Prossimo sabato e prossimo appuntamento: due schede, si apre per prima quella che viene prima. */
+function vistaProssimo(d) {
+  S.vistaProssimo = true;
+  const sab = d && d.sabato, ev = d && d.evento;
+  const disegnaSabato = () => !sab ? vuoto('Nessun sabato in calendario.') : S.utente.adulto ? vistaSabatoAdulti(sab) : vistaSabato(sab);
+  if (!ev) return disegnaSabato();
+  const idS = sab && sab.calendario ? sab.calendario.idData : '99999999';
+  let scelta = S.prossimoScheda || (ev.evento.idData < idS ? 'evento' : 'sabato');
+  const corto = t => t.length > 18 ? t.slice(0, 17) + '…' : t;
+  const breveEv = dataDaId(ev.evento.idData).getDate() + ' ' + MESI[dataDaId(ev.evento.idData).getMonth()].slice(0, 3);
+  const corpo = h('div');
+  const bottoni = [
+    sab && sab.calendario ? ['sabato', 'Sabato ' + sab.calendario.breve] : null,
+    ['evento', corto(ev.evento.titolo) + ' · ' + breveEv]
+  ].filter(Boolean);
+  const seg = h('div', { class: 'segmento-piccolo', style: 'margin-top:2px' }, bottoni.map(t => h('button', { class: t[0] === scelta ? 'on' : '', onclick: () => {
+    scelta = S.prossimoScheda = t[0];
+    seg.querySelectorAll('button').forEach((b, i) => b.classList.toggle('on', bottoni[i][0] === scelta));
+    disegna();
+  } }, t[1])));
+  function disegna() { corpo.replaceChildren(scelta === 'evento' || !sab ? vistaEvento(ev) : disegnaSabato()); }
+  disegna();
+  return h('div', {}, [seg, corpo]);
+}
+
+/** Il prossimo appuntamento del calendario parrocchiale, con la presenza da segnare. */
+function vistaEvento(pe) {
+  const e = pe.evento, p = pe.presenze || {};
+  const dt = dataDaId(e.idData);
+  const orario = e.oraInizio ? e.oraInizio + (e.oraFine ? ' – ' + e.oraFine : '') : 'Tutto il giorno';
+  const fine = e.piuGiorni ? ' · fino al ' + dataDaId(e.idDataFine).getDate() + ' ' + MESI[dataDaId(e.idDataFine).getMonth()] : '';
+  const box = h('div', {}, h('div', { class: 'hero' }, [
+    h('div', { class: 'occhiello' }, 'Prossimo appuntamento' + (e.perAnimatori ? ' · per animatori' : '')),
+    h('div', { class: 'linea' }, [
+      h('div', { class: 'giorno' }, dt.getDate()),
+      h('div', {}, [
+        h('div', { class: 'mese' }, GIORNI_BREVI[dt.getDay()] + ' · ' + MESI[dt.getMonth()] + ' ' + dt.getFullYear()),
+        h('div', { class: 'orari' }, orario + fine)
+      ])
+    ]),
+    h('div', { class: 'evento' }, e.titolo),
+    e.luogo ? h('p', { class: 'nota' }, e.luogo) : null
+  ]));
+  if (e.nota) box.appendChild(h('div', { class: 'modulo' }, e.nota));
+
+  // presenza: gli adulti sempre, gli animatori solo agli eventi per animatori
+  const conta = h('div');
+  const disegnaChi = () => {
+    const righe = [];
+    if (e.perAnimatori) {
+      righe.push(['Animatori che ci sono', p.nomi && p.nomi.length ? p.nomi.join(', ') : p.quanti ? p.quanti + (p.quanti === 1 ? ' animatore' : ' animatori') : 'ancora nessuno']);
+      if (p.animatoriNo && p.animatoriNo.length) righe.push(['Animatori che non ci sono', p.animatoriNo.join(', ')]);
+    }
+    if (S.utente.adulto || (p.adulti && p.adulti.length)) righe.push(['Adulti che ci sono', p.adulti && p.adulti.length ? p.adulti.join(', ') : 'ancora nessuno']);
+    if (p.adultiNo && p.adultiNo.length) righe.push(['Adulti che non ci sono', p.adultiNo.join(', ')]);
+    conta.replaceChildren(...righe.map(r => h('div', { style: 'margin-top:6px' }, [h('div', { class: 'piccolo muto' }, r[0]), h('div', {}, r[1])])));
+  };
+  disegnaChi();
+  let presenza = null;
+  const etichettaMia = h('div', { class: 'piccolo muto' });
+  const scriviMia = () => etichettaMia.textContent = p.mia === 'nessuna' ? 'Non hai ancora detto se ci sarai.' : p.mia === 'presente' ? 'Hai detto che ci sei.' : 'Hai detto che non ci sei.';
+  scriviMia();
+  if (p.puoSegnare && e.idDataFine >= oggiId()) {
+    if (p.verificata && !S.utente.adulto) presenza = h('div', { class: 'etichetta ' + (p.verificata === 'Presente' ? 'verde' : 'rossa') }, p.verificata === 'Presente' ? 'presenza confermata all\'appello · +20 punti' : 'all\'appello risulti assente');
+    else presenza = sceltaDue(p.mia, ['Ci sono', 'Non ci sono'], ['presente', 'assente'], async v => {
+      await api('salvaPresenzaEvento', { idEvento: e.id, stato: v === 'presente' });
+      const io = S.utente.nomeVis;
+      const togli = l => (l || []).filter(n => n !== io);
+      if (S.utente.adulto) { p.adulti = togli(p.adulti); p.adultiNo = togli(p.adultiNo); (v === 'presente' ? p.adulti : p.adultiNo).push(io); }
+      else {
+        if (v === 'presente' && p.mia !== 'presente') p.quanti = (p.quanti || 0) + 1;
+        if (v !== 'presente' && p.mia === 'presente') p.quanti = Math.max(0, (p.quanti || 0) - 1);
+        if (p.nomi && (p.nomi.length || S.utente.livello >= 3)) { p.nomi = togli(p.nomi); p.animatoriNo = togli(p.animatoriNo); (v === 'presente' ? p.nomi : p.animatoriNo).push(io); }
+      }
+      p.mia = v; disegnaChi(); scriviMia();
+      svuotaCacheTelefono(['prossimo', 'eventi']);
+      toast(v === 'presente' ? 'Presenza segnata' : 'Assenza registrata');
+    });
+  }
+  box.appendChild(h('div', { class: 'modulo' }, [
+    presenza ? etichettaMia : null,
+    presenza ? h('div', { style: 'margin:8px 0 6px' }, presenza) : null,
+    !p.puoSegnare && !S.utente.adulto ? h('p', { class: 'muto piccolo', style: 'margin:0 0 6px' }, 'È un appuntamento per gli adulti della parrocchia: gli animatori non devono segnare la presenza.') : null,
+    conta
+  ]));
+  if (pe.volantini && pe.volantini.length) {
+    box.appendChild(h('h2', {}, 'Volantino'));
+    pe.volantini.forEach(v => box.appendChild(schedaVolantinoPronto(v, null)));
+  }
+  box.appendChild(h('div', { class: 'azioni' }, h('button', { class: 'b secondario', onclick: () => vai('calendario') }, 'Tutto il calendario')));
+  return box;
 }
 
 function intestazioneData(cal) {
@@ -1476,36 +1623,7 @@ function vistaSabato(d) {
     // presenza (solo per date non passate)
     if (cal.idData >= oggiId() && (S.utente || {}).disponibilita !== 'nessuno') box.appendChild(blocchettoPresenza(cal.idData, d.presenzaMia));
 
-    // le attività dell'ora prima della Messa stanno insieme al gioco libero,
-    // in una tendina: sono sei ogni sabato e affogherebbero il resto
-    const attivita = d.voci.filter(v => v.categoria === 'Attività');
-    const principali = d.voci.filter(v => v.categoria !== 'Attività');
-
-    box.appendChild(h('h2', {}, 'Programma'));
-    if (!principali.length) box.appendChild(vuoto('Programma non ancora definito.'));
-    const lista = h('div', { class: 'lista' });
-    principali.forEach(v => lista.appendChild(rigaVoce(v, cal.idData)));
-    box.appendChild(lista);
-
-    if (attivita.length || d.ricorrenti.length) {
-      const dentro = h('div', {});
-      if (attivita.length) {
-        const l1 = h('div', { class: 'lista', style: 'margin-top:12px' });
-        attivita.forEach(v => l1.appendChild(rigaVoce(v, cal.idData)));
-        dentro.appendChild(l1);
-      }
-      if (d.ricorrenti.length) {
-        const l2 = h('div', { class: 'lista', style: 'margin-top:12px' });
-        d.ricorrenti.forEach(r => l2.appendChild(h('div', { class: 'riga' + (r.coinvolto ? ' mia' : '') }, [
-          h('div', { class: 'titolo' }, r.attivita),
-          r.persone.length ? h('div', { class: 'persone' }, testoPersone(r.persone)) : null
-        ])));
-        dentro.appendChild(l2);
-      }
-      const mie = attivita.some(v => v.coinvolto) || d.ricorrenti.some(r => r.coinvolto);
-      box.appendChild(h('div', { style: 'margin-top:10px' },
-        tendina('Attività e gioco libero', attivita.length + d.ricorrenti.length, dentro, mie)));
-    }
+    bloccoProgramma(d).forEach(el => box.appendChild(el));
   }
   // adulti presenti: solo per i sabati aperti non ancora passati
   if (cal.tipo !== 'Chiuso' && cal.idData >= oggiId()) {
@@ -1518,6 +1636,43 @@ function vistaSabato(d) {
   }
   if (!d.prossimo) box.appendChild(h('div', { class: 'azioni' }, h('button', { class: 'b secondario', onclick: () => schermataSabato() }, 'Vai al prossimo sabato')));
   return box;
+}
+
+/** Il programma di un sabato (voci, attività e gioco libero), come lo vedono gli animatori. */
+function bloccoProgramma(d) {
+  const out = [];
+  const cal = d.calendario;
+  // le attività dell'ora prima della Messa stanno insieme al gioco libero,
+  // in una tendina: sono sei ogni sabato e affogherebbero il resto
+  const attivita = d.voci.filter(v => v.categoria === 'Attività');
+  const principali = d.voci.filter(v => v.categoria !== 'Attività');
+
+  out.push(h('h2', {}, 'Programma'));
+  if (!principali.length) out.push(vuoto('Programma non ancora definito.'));
+  const lista = h('div', { class: 'lista' });
+  principali.forEach(v => lista.appendChild(rigaVoce(v, cal.idData)));
+  out.push(lista);
+
+  if (attivita.length || d.ricorrenti.length) {
+    const dentro = h('div', {});
+    if (attivita.length) {
+      const l1 = h('div', { class: 'lista', style: 'margin-top:12px' });
+      attivita.forEach(v => l1.appendChild(rigaVoce(v, cal.idData)));
+      dentro.appendChild(l1);
+    }
+    if (d.ricorrenti.length) {
+      const l2 = h('div', { class: 'lista', style: 'margin-top:12px' });
+      d.ricorrenti.forEach(r => l2.appendChild(h('div', { class: 'riga' + (r.coinvolto ? ' mia' : '') }, [
+        h('div', { class: 'titolo' }, r.attivita),
+        r.persone.length ? h('div', { class: 'persone' }, testoPersone(r.persone)) : null
+      ])));
+      dentro.appendChild(l2);
+    }
+    const mie = attivita.some(v => v.coinvolto) || d.ricorrenti.some(r => r.coinvolto);
+    out.push(h('div', { style: 'margin-top:10px' },
+      tendina('Attività e gioco libero', attivita.length + d.ricorrenti.length, dentro, mie)));
+  }
+  return out;
 }
 
 function testoPersone(persone) {
@@ -1544,8 +1699,8 @@ function blocchettoPresenza(idData, stato) {
     toast(presente ? 'Presenza confermata' : 'Assenza registrata');
     try {
       const r = await api('salvaPresenza', { idData, stato: presente });
-      svuotaCacheTelefono(['io', 'prossimoSabato', 'sabato', 'avvio', 'sabatoAdulti']);
-      if (S.utente.adulto && S.schermata === 'sabato') schermataSabatoAdulti(idData);   // aggiorna l'elenco di chi c'è
+      svuotaCacheTelefono(['io', 'prossimoSabato', 'prossimo', 'sabato', 'avvio', 'sabatoAdulti']);
+      if (S.utente.adulto && S.schermata === 'sabato') { if (S.vistaProssimo) schermataSabato(); else schermataSabatoAdulti(idData); }   // aggiorna l'elenco di chi c'è
       if (r.nuoveCarte && r.nuoveCarte.length) mostraCarteNuove({ nuove: r.nuoveCarte, trofeoNuovo: r.trofeoNuovo });
     } catch (e) {
       si.className = prima[0]; no.className = prima[1];
@@ -1700,17 +1855,16 @@ function disegnaIo(d) {
   if (d.utente.disponibilita !== 'nessuno') box.appendChild(bloccoMieiSabati(d.sabatiFuturi));
   else if (d.prossimo) box.appendChild(h('p', { class: 'piccolo muto', style: 'margin-top:14px' }, 'Prossimo sabato: ' + d.prossimo.testo));
 
-  box.appendChild(h('h2', {}, 'I miei incarichi'));
+  // tutti gli incarichi in una tendina: si aprono solo se servono
   const futuri = d.incarichi.filter(i => i.futuro), passati = d.incarichi.filter(i => !i.futuro);
-  if (!futuri.length) box.appendChild(vuoto('Nessun incarico in programma.'));
-  const l = h('div', { class: 'lista' });
-  futuri.forEach(i => l.appendChild(rigaIncarico(i)));
-  box.appendChild(l);
-  if (passati.length) {
-    const l2 = h('div', { class: 'lista', style: 'margin-top:12px' });
-    passati.forEach(i => l2.appendChild(rigaIncarico(i)));
-    box.appendChild(h('div', { style: 'margin-top:10px' }, tendina('Incarichi passati', passati.length, l2)));
-  }
+  const dentroInc = h('div', {}, [
+    futuri.length ? h('div', { class: 'lista' }, futuri.map(rigaIncarico)) : vuoto('Nessun incarico in programma.'),
+    passati.length ? h('div', { style: 'margin-top:12px' }, tendina('Già fatti', passati.length, h('div', { class: 'lista' }, passati.map(rigaIncarico)))) : null
+  ]);
+  const prossimoInc = futuri[0];
+  box.appendChild(h('h2', {}, 'I miei incarichi'));
+  box.appendChild(tendina(prossimoInc ? 'Prossimo: ' + prossimoInc.breve + ' · ' + prossimoInc.attivita : 'Nessuno in programma',
+    futuri.length ? futuri.length + ' in programma' : null, dentroInc));
   if (d.collezione) box.appendChild(bloccoCollezioneIo(d.collezione));
   box.appendChild(bloccoMioAnno(d.mioAnno));
 
@@ -1926,7 +2080,7 @@ function rigaEvento(e, oggi, dopoModifica) {
     voce('orologio', 'Orario', e.oraInizio ? (e.oraInizio + (e.oraFine ? ' – ' + e.oraFine : '')) : 'Tutto il giorno'),
     e.luogo ? voce('luogo', 'Luogo', e.luogo) : null,
     e.nota ? voce('nota', 'Note', e.nota, 'nota') : null,
-    e.perAnimatori ? presenzaEvento(e, oggi) : null,
+    e.perAnimatori || S.utente.adulto ? presenzaEvento(e, oggi) : null,
     S.utente.livello >= 3
       ? h('div', { class: 'azioni' },
           h('button', { class: 'b secondario piccolo', onclick: ev => { ev.stopPropagation(); vai('gestione'); setTimeout(() => schermataGestione('eventi', e.id), 0); } }, 'Modifica'))
@@ -1970,29 +2124,36 @@ function rigaEvento(e, oggi, dopoModifica) {
 
 const GIORNI_BREVI = ['dom', 'lun', 'mar', 'mer', 'gio', 'ven', 'sab'];
 
-/** Dentro il dettaglio di un evento per animatori: "Ci sono" / "Non ci sono" e chi viene. */
+/** Dentro il dettaglio di un evento: "Ci sono" / "Non ci sono" e chi viene. */
 function presenzaEvento(e, oggi) {
-  const p = (S.presEventi || {})[e.id] || { mia: 'nessuna', verificata: '', quanti: 0, nomi: [] };
+  const p = (S.presEventi || {})[e.id] || { mia: 'nessuna', verificata: '', quanti: 0, nomi: [], adulti: [], puoSegnare: S.utente.adulto || e.perAnimatori };
   const box = h('div', { class: 'voce', onclick: ev => ev.stopPropagation() });
   const conta = h('div', { class: 'piccolo muto', style: 'margin-top:6px' });
-  const scrivi = () => conta.replaceChildren(p.quanti ? (p.quanti === 1 ? '1 animatore ha detto che c\'è' : p.quanti + ' animatori hanno detto che ci sono') +
-    (p.nomi && p.nomi.length ? ': ' + p.nomi.join(', ') : '') : 'Ancora nessuno ha detto che c\'è.');
+  const scrivi = () => {
+    const parti = [];
+    if (e.perAnimatori) parti.push(p.quanti ? (p.quanti === 1 ? '1 animatore c\'è' : p.quanti + ' animatori ci sono') + (p.nomi && p.nomi.length ? ': ' + p.nomi.join(', ') : '') : 'Ancora nessun animatore.');
+    if (S.utente.adulto || (p.adulti && p.adulti.length)) parti.push(p.adulti && p.adulti.length ? 'Adulti: ' + p.adulti.join(', ') : 'Ancora nessun adulto.');
+    conta.replaceChildren(parti.join(' · '));
+  };
   scrivi();
   let scelta = null;
-  if (!S.utente.adulto) {
-    if (p.verificata === 'Presente') scelta = h('div', { class: 'etichetta verde' }, 'presenza confermata · +20 punti');
-    else if (p.verificata === 'Assente') scelta = h('div', { class: 'etichetta rossa' }, 'all\'appello risulti assente');
-    else if (e.idDataFine >= oggi) scelta = sceltaDue(p.mia, ['Ci sono', 'Non ci sono'], ['presente', 'assente'], async v => {
-      await api('salvaPresenzaEvento', { idEvento: e.id, stato: v === 'presente' });
+  if (p.verificata === 'Presente' && !S.utente.adulto) scelta = h('div', { class: 'etichetta verde' }, 'presenza confermata · +20 punti');
+  else if (p.verificata === 'Assente' && !S.utente.adulto) scelta = h('div', { class: 'etichetta rossa' }, 'all\'appello risulti assente');
+  else if (p.puoSegnare !== false && e.idDataFine >= oggi) scelta = sceltaDue(p.mia, ['Ci sono', 'Non ci sono'], ['presente', 'assente'], async v => {
+    await api('salvaPresenzaEvento', { idEvento: e.id, stato: v === 'presente' });
+    if (S.utente.adulto) {
+      p.adulti = (p.adulti || []).filter(n => n !== S.utente.nomeVis);
+      if (v === 'presente') p.adulti.push(S.utente.nomeVis);
+    } else {
       if (v === 'presente' && p.mia !== 'presente') p.quanti++;
       if (v !== 'presente' && p.mia === 'presente') p.quanti--;
-      p.mia = v; scrivi();
-      svuotaCacheTelefono(['eventi']);
-      toast(v === 'presente' ? 'Presenza segnata' : 'Assenza registrata');
-    });
-  }
+    }
+    p.mia = v; scrivi();
+    svuotaCacheTelefono(['eventi', 'prossimo']);
+    toast(v === 'presente' ? 'Presenza segnata' : 'Assenza registrata');
+  });
   box.append(h('span', { class: 'ico' }, icona('io')), h('div', { class: 'testo' }, [
-    h('small', {}, 'Per gli animatori'),
+    h('small', {}, e.perAnimatori ? 'Presenze (evento per animatori)' : 'Presenze degli adulti'),
     scelta, conta]));
   return box;
 }
@@ -2599,7 +2760,7 @@ function bloccoDaSistemare(d, ricarica) {
       const r = await api('applicaRiassegnazioni', { modifiche });
       toast(r.fatte + ' incarichi riassegnati');
       if (r.saltate.length) alert('Fatto. Alcune erano già cambiate:\n\n' + r.saltate.join('\n'));
-      svuotaCacheTelefono(['sabato', 'prossimoSabato', 'avvio', 'io']);
+      svuotaCacheTelefono(['sabato', 'prossimoSabato', 'prossimo', 'avvio', 'io']);
       ricarica('sabati');
     } catch (e) { esito.replaceChildren(errore(e)); conferma.disabled = false; }
   } }, 'Conferma tutte (' + d.problemi.length + ')');
@@ -2640,12 +2801,12 @@ function vistaSabatiIncarichi(area, d, ricarica) {
             h('button', { class: 'b piccolo', onclick: async () => {
               if (!sel.value) return;
               try { await api('applicaRiassegnazioni', { modifiche: [{ tipo: 'assegnazione', chiave: v.idProg, da: p.idAnimatore, a: sel.value }] });
-                toast('Sostituito'); svuotaCacheTelefono(['sabato', 'prossimoSabato', 'avvio']); ricarica('sabati'); } catch (e) { toast(String(e), true); }
+                toast('Sostituito'); svuotaCacheTelefono(['sabato', 'prossimoSabato', 'prossimo', 'avvio']); ricarica('sabati'); } catch (e) { toast(String(e), true); }
             } }, 'Sostituisci'),
             h('button', { class: 'b pericolo piccolo', onclick: async () => {
               if (!confirm('Togliere ' + p.nomeVis + ' senza sostituirlo?')) return;
               try { await api('applicaRiassegnazioni', { modifiche: [{ tipo: 'assegnazione', chiave: v.idProg, da: p.idAnimatore, a: '' }] });
-                toast('Tolto'); svuotaCacheTelefono(['sabato', 'prossimoSabato', 'avvio']); ricarica('sabati'); } catch (e) { toast(String(e), true); }
+                toast('Tolto'); svuotaCacheTelefono(['sabato', 'prossimoSabato', 'prossimo', 'avvio']); ricarica('sabati'); } catch (e) { toast(String(e), true); }
             } }, 'Togli'),
             h('button', { class: 'b secondario piccolo', onclick: chiudi }, 'Annulla')
           ]));
@@ -2675,7 +2836,7 @@ function vistaSabatiIncarichi(area, d, ricarica) {
           h('button', { class: 'b piccolo', onclick: async () => {
             if (!scelta || !scelta.value) return;
             try { await api('salvaAssegnazione', { idProg: v.idProg, idAnimatore: scelta.value, ruolo: ruolo.value, azione: 'aggiungi' });
-              toast('Aggiunto'); svuotaCacheTelefono(['sabato', 'prossimoSabato', 'avvio']); ricarica('sabati'); } catch (e) { toast(String(e), true); }
+              toast('Aggiunto'); svuotaCacheTelefono(['sabato', 'prossimoSabato', 'prossimo', 'avvio']); ricarica('sabati'); } catch (e) { toast(String(e), true); }
           } }, 'Aggiungi'),
           h('button', { class: 'b secondario piccolo', onclick: chiudi }, 'Annulla')
         ]));
@@ -2886,7 +3047,7 @@ async function gestioneSabati(cont, vista) {
         const r = await api('sorteggiaPreghiere', { rifai: false });
         if (!r.sorteggiate) { toast('Tutte le preghiere hanno già qualcuno'); riempi.disabled = false; return; }
         toast(r.sorteggiate + (r.sorteggiate === 1 ? ' preghiera assegnata' : ' preghiere assegnate'));
-        svuotaCacheTelefono(['sabato', 'prossimoSabato', 'avvio', 'io']);
+        svuotaCacheTelefono(['sabato', 'prossimoSabato', 'prossimo', 'avvio', 'io']);
         ricarica('tutti');
       } catch (e) { esitoSorteggio.replaceChildren(errore(e)); riempi.disabled = false; }
     } }, 'Riempi le preghiere vuote');
@@ -2947,7 +3108,7 @@ async function gestionePresenze(cont) {
     const scoperti = d.sabati.filter(c => c.assentiConIncarico);
     area.replaceChildren(
       scoperti.length ? h('div', { class: 'avviso', style: 'margin-top:0' }, 'Incarichi di chi ha detto che non c\'è: ' +
-        scoperti.map(c => c.breve + ' (' + c.assentiConIncarico + ')').join(', ') + '. Per preghiere, serate ed eventi trovi il sostituto in Sabati → Tutti i sabati.') : null,
+        scoperti.map(c => c.breve + ' (' + c.assentiConIncarico + ')').join(', ') + (S.utente.livello >= 3 ? '. Per preghiere, serate ed eventi trovi il sostituto in Sabati → Tutti i sabati.' : '.')) : null,
       righe.length ? h('div', { class: 'griglia-pres' }, h('table', {}, [h('thead', {}, testa), h('tbody', {}, corpo)]))
         : vuoto(filtro === 'nessuna' ? 'Hanno risposto tutti in questi sabati.' : 'Nessuno risulta assente in questi sabati.'),
       h('div', { class: 'legenda-pres' }, [
@@ -3916,7 +4077,7 @@ async function gestioneSquadre(cont) {
   }
   /** Dopo una modifica: le copie salvate sul telefono vanno rifatte. */
   function dopoSquadra(r, testo) {
-    svuotaCacheTelefono(['sabato', 'prossimoSabato', 'avvio', 'io', 'incarichi', 'gestioneSabato', 'squadre']);
+    svuotaCacheTelefono(['sabato', 'prossimoSabato', 'prossimo', 'avvio', 'io', 'incarichi', 'gestioneSabato', 'squadre']);
     toast(testo + (r && r.sabati ? ' · vale per ' + r.sabati + ' sabati futuri' : ''));
   }
   disegna();
